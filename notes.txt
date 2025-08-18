@@ -1,0 +1,136 @@
+
+<to-do>
+
+daily_metrics에 들어갈 것과 구조 확정
+
+
+
+주요 경제지표(금리, 환율, 인플레율 등)와 벤치마크 지표 로딩해놓기
+벤치마크 지표
+-코스피/코스닥
+-나스닥/S&P500
+-무위험이자율
+
+
+
+
+2. 벤치마크 비교
+ -절대·초과수익(Return vs. Benchmark): 벤치마크 대비 절대수익, 초과수익 및 누적 초과수익 추이
+ -추적오차(Tracking Error): 월간 및 분기별 추적오차 지표?
+ -정보비율(Information Ratio): 초과수익 대비 변동성
+
+3. 리스크 지표 (Risk Metrics)
+ -변동성(Volatility): 월간·연환산 수익 변동성
+ -샤프 비율(Sharpe Ratio): 무위험 수익률 대비 위험조정수익
+
+Value at Risk (VaR)
+95%, 99% 신뢰구간 VaR ?
+
+4. 포지션 변화 및 거래 내역
+ -월말·월초 자산 비중 변화
+ -자산군 및 개별 종목별 비중 증감 분석
+ -매수·매도 요약: 거래 수량·금액, 거래 횟수, 평균 거래단가
+-----------------------------------------------------------
+
+
+<완료>
+
+첫번째 티커가 tickers.csv에 안들어감
+세금, 수수료 따로 넣기
+현금 잔고 표시
+평균 원가법 사용: 매수 시에만 평단가, 수량 계산 반영, 매도 시에는 평단가는 그대로, 수량만 바꿈 + 제세금, 수수료 따로
+세금, 수수료는 비율 계산 대신 거래 내역에 나온 금액으로 처리
+비영업일 따로 처리
+decimal vs float
+gui에 입력한 거래 -> 포트폴리오에 반영 (홈페이지 기준과 추적오차 없애기)
+상품별 주간,월간,분기 간 수익 기여(asset_attribution_periodic)
+상품군별 주간,월간,분기 간 수익 기여(asset_class_attribution_periodic)
+주간,월간, 분기간 Top/Bottom 기여자(attribution_highlight_periodic)
+상품군별 일간 수익률(asset_class_returns_daily)
+
+
+1. 성과 기여도 분석
+ - 상품별 수익 기여도: 각 종목이 포트폴리오 전체 수익에 얼마를 기여했는지 산출하여, Top 5 기여자·Top 5 저해자 리스트 작성
+ -자산군별 수익 기여도: 자산군별(예: 국내주식, 해외채권, 대체투자 등) 수익 기여도를 백분율로 파악
+
+
+-----------------------------------------------------------------
+(tkinter or react?)
+
+Dashboard
+
+시각화
+-포트폴리오 비중
+-포트폴리오 누적/당일/특정 기간 수익률
+-자산별 누적/당일/특정 기간 가격 등락
+-주요 지수, 환율
+
+
+
+Analytics 모듈
+
+-자산 별 샤프 지수
+-권장 리밸런싱 - 어떻게?....
+-넣어야할 주문?
++?
+
+
+----------------------------------------------
+<프로그램 흐름>
+
+-prices
+fetch_prices로 투자가능 종목(약 700 종목)이미 저장된 날짜 이후의 종가 데이터 불러옴(yfinance)
+
+
+
+
+<테이블 요약>
+
+portfolios 테이블
+id
+name
+created_at
+currency
+
+assets 테이블
+id
+ticker
+name
+currency
+asset_group
+
+prices 테이블
+id
+asset_id
+date
+close
+
+
+**삭제 portfolio_holdings테이블 : 포트폴리오 실시간 요약(최신기준)
+id
+portfolio_id
+asset_id
+quantity
+avg_price
+
+transactions 테이블
+id
+portfolio_id
+asset_id
+trans_date
+quantity
+price
+fee
+tax
+type
+
+portfolio_positions_daily
+id
+portfolio_id
+as_of_date
+asset_id
+quantity
+avg_price
+market_value
+cash_balance
+nav
