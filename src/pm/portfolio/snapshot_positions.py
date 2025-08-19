@@ -13,7 +13,7 @@ from pm.db.models import (
 def snapshot_portfolio_date(portfolio_id: int, as_of_date: date):
     session = SessionLocal()
     try:
-        # ── 1) cash_balance 계산 (fee, tax 반영) - 최적화: 한 번의 쿼리로 통합 ──
+        # ── 1) cash_balance 계산 (fee, tax 반영) - 최적화: 거래 유형별 한 번에 계산 ──
         p = session.get(Portfolio, portfolio_id)
         initial_cash = getattr(p, 'initial_cash', Decimal('0'))
 
@@ -21,14 +21,9 @@ def snapshot_portfolio_date(portfolio_id: int, as_of_date: date):
         cash_flows = session.execute(
             select(
                 Transaction.type,
-                func.coalesce(func.sum(
-                    func.case(
-                        (Transaction.type == 'BUY', -(Transaction.quantity * Transaction.price + Transaction.fee + Transaction.tax)),
-                        (Transaction.type == 'SELL', Transaction.quantity * Transaction.price - Transaction.fee - Transaction.tax),
-                        (Transaction.type == 'DEPOSIT', Transaction.quantity * Transaction.price - Transaction.fee - Transaction.tax),
-                        else_=Decimal('0')
-                    )
-                ), Decimal('0')).label('amount')
+                func.coalesce(func.sum(Transaction.quantity * Transaction.price), Decimal('0')).label('principal'),
+                func.coalesce(func.sum(Transaction.fee), Decimal('0')).label('total_fee'),
+                func.coalesce(func.sum(Transaction.tax), Decimal('0')).label('total_tax')
             )
             .where(
                 Transaction.portfolio_id == portfolio_id,
@@ -38,16 +33,13 @@ def snapshot_portfolio_date(portfolio_id: int, as_of_date: date):
             .group_by(Transaction.type)
         ).all()
 
-        # 결과를 딕셔너리로 변환
-        cash_changes = {transaction_type: amount for transaction_type, amount in cash_flows}
-        
-        # cash_balance 계산
-        cash_balance = (
-            initial_cash + 
-            cash_changes.get('BUY', Decimal('0')) + 
-            cash_changes.get('SELL', Decimal('0')) + 
-            cash_changes.get('DEPOSIT', Decimal('0'))
-        )
+        # 결과를 딕셔너리로 변환하고 cash_balance 계산
+        cash_balance = initial_cash
+        for transaction_type, principal, total_fee, total_tax in cash_flows:
+            if transaction_type == 'BUY':
+                cash_balance -= (principal + total_fee + total_tax)
+            elif transaction_type in ['SELL', 'DEPOSIT']:
+                cash_balance += (principal - total_fee - total_tax)
 
         # ── 2) 거래된 자산 리스트 ──
         asset_ids = session.execute(
@@ -143,7 +135,7 @@ def snapshot_portfolio_date(portfolio_id: int, as_of_date: date):
                 PortfolioPositionDaily.as_of_date == as_of_date,
                 PortfolioPositionDaily.asset_id.in_(asset_ids)
             )
-        ).all()
+        ).scalars().all()
         
         existing_positions_map = {pos.asset_id: pos for pos in existing_positions}
 

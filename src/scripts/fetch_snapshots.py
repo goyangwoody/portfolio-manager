@@ -154,5 +154,5 @@ def run_full_snapshot_nyse(
 
 
 if __name__ == "__main__":
-    
-    run_full_snapshot_krx('2025-08-09', '2025-08-15', [1])
+
+    run_full_snapshot_krx('2025-08-12', '2025-08-18', [1])
