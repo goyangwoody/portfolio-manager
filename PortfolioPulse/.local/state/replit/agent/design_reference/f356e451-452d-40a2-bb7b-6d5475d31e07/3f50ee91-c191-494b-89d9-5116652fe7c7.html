@@ -1,0 +1,656 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Dashboard - External Reporting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#3B82F6',
+                        'success': '#10B981',
+                        'warning': '#F59E0B',
+                        'danger': '#EF4444',
+                        'dark-bg': '#1F2937',
+                        'dark-card': '#374151',
+                        'dark-text': '#F9FAFB',
+                    }
+                }
+            },
+            darkMode: 'class'
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="font-inter bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-dark-text min-h-screen pb-20">
+    <!-- @COMPONENT: Header -->
+    <header class="bg-white dark:bg-dark-card shadow-sm px-4 py-3 sticky top-0 z-40">
+        <div class="flex items-center justify-between max-w-md mx-auto">
+            <div>
+                <h1 class="text-lg font-semibold text-gray-900 dark:text-dark-text" data-bind="portfolio.name">Alpha Growth Fund</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400" data-bind="lastUpdated">Updated 2 hours ago</p>
+            </div>
+            <button data-event="click:toggleTheme" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                <i class="fas fa-moon dark:hidden text-lg"></i>
+                <i class="fas fa-sun hidden dark:inline text-lg"></i>
+            </button>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+
+    <!-- @COMPONENT: MainContent -->
+    <main class="max-w-md mx-auto px-4 py-6">
+        
+        <!-- @COMPONENT: OverviewPage -->
+        <div id="overview-page" class="page-content">
+            <!-- KPI Cards Section -->
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <!-- @COMPONENT: KPICard -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Return</div>
+                    <div class="text-2xl font-bold text-success" data-bind="portfolio.totalReturn" data-mock="true">+12.4%</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">YTD</div>
+                </div>
+                <!-- @END_COMPONENT: KPICard -->
+
+                <!-- @COMPONENT: KPICard -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Sharpe Ratio</div>
+                    <div class="text-2xl font-bold text-primary" data-bind="portfolio.sharpeRatio" data-mock="true">1.8</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">12M</div>
+                </div>
+                <!-- @END_COMPONENT: KPICard -->
+
+                <!-- @COMPONENT: KPICard -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">NAV</div>
+                    <div class="text-2xl font-bold text-gray-900 dark:text-dark-text" data-bind="portfolio.nav" data-mock="true">$24.72</div>
+                    <div class="text-xs text-success mt-1">+0.3% today</div>
+                </div>
+                <!-- @END_COMPONENT: KPICard -->
+
+                <!-- @COMPONENT: KPICard -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">AUM</div>
+                    <div class="text-2xl font-bold text-gray-900 dark:text-dark-text" data-bind="portfolio.aum" data-mock="true">$2.4B</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Total</div>
+                </div>
+                <!-- @END_COMPONENT: KPICard -->
+            </div>
+
+            <!-- Performance Chart -->
+            <!-- @COMPONENT: PerformanceChart -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text">Performance vs Benchmark</h3>
+                    <select class="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        <option>1Y</option>
+                        <option>3Y</option>
+                        <option>5Y</option>
+                    </select>
+                </div>
+                <div class="h-64 w-full">
+                    <canvas id="performanceChart" class="w-full h-full"></canvas>
+                </div>
+                <div class="flex items-center justify-center space-x-6 mt-4 text-sm">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-primary rounded-full"></div>
+                        <span class="text-gray-600 dark:text-gray-400">Portfolio</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
+                        <span class="text-gray-600 dark:text-gray-400">S&P 500</span>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: PerformanceChart -->
+
+            <!-- Quick Stats -->
+            <!-- @COMPONENT: QuickStats -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Key Metrics</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Volatility (12M)</span>
+                        <span class="font-medium" data-bind="portfolio.volatility" data-mock="true">14.2%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Max Drawdown</span>
+                        <span class="font-medium text-danger" data-bind="portfolio.maxDrawdown" data-mock="true">-8.4%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Beta</span>
+                        <span class="font-medium" data-bind="portfolio.beta" data-mock="true">0.92</span>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: QuickStats -->
+        </div>
+        <!-- @END_COMPONENT: OverviewPage -->
+
+        <!-- @COMPONENT: PerformancePage -->
+        <div id="performance-page" class="page-content hidden">
+            <!-- Returns Cards -->
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm text-center">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">1D</div>
+                    <div class="text-lg font-bold text-success" data-bind="performance.daily" data-mock="true">+0.3%</div>
+                </div>
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm text-center">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">1M</div>
+                    <div class="text-lg font-bold text-success" data-bind="performance.monthly" data-mock="true">+2.1%</div>
+                </div>
+                <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm text-center">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">3M</div>
+                    <div class="text-lg font-bold text-success" data-bind="performance.quarterly" data-mock="true">+5.8%</div>
+                </div>
+            </div>
+
+            <!-- Performance Comparison Chart -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Monthly Returns</h3>
+                <div class="h-64 w-full">
+                    <canvas id="monthlyReturnsChart" class="w-full h-full"></canvas>
+                </div>
+            </div>
+
+            <!-- Benchmark Comparison Table -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">vs Benchmarks</h3>
+                <div class="space-y-3">
+                    <!-- @MAP: benchmarks.map(benchmark => ( -->
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-bind="benchmark.name" data-mock="true">S&P 500</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">YTD Performance</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-gray-600 dark:text-gray-400" data-bind="benchmark.return" data-mock="true">+8.9%</div>
+                            <div class="text-sm text-success" data-bind="benchmark.outperformance" data-mock="true">+3.5%</div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">MSCI World</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">YTD Performance</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-gray-600 dark:text-gray-400" data-mock="true">+7.2%</div>
+                            <div class="text-sm text-success" data-mock="true">+5.2%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: PerformancePage -->
+
+        <!-- @COMPONENT: AttributionPage -->
+        <div id="attribution-page" class="page-content hidden">
+            <!-- Asset Class Attribution -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Attribution by Asset Class</h3>
+                <div class="space-y-3">
+                    <!-- @MAP: attributions.map(attribution => ( -->
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-primary rounded-full"></div>
+                            <span class="font-medium text-gray-900 dark:text-dark-text" data-bind="attribution.assetClass" data-mock="true">US Equities</span>
+                        </div>
+                        <span class="font-medium text-success" data-bind="attribution.contribution" data-mock="true">+4.2%</span>
+                    </div>
+                    <!-- @END_MAP )) -->
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-success rounded-full"></div>
+                            <span class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">International Equities</span>
+                        </div>
+                        <span class="font-medium text-success" data-mock="true">+2.8%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-warning rounded-full"></div>
+                            <span class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">Fixed Income</span>
+                        </div>
+                        <span class="font-medium text-success" data-mock="true">+1.1%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-danger rounded-full"></div>
+                            <span class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">Commodities</span>
+                        </div>
+                        <span class="font-medium text-danger" data-mock="true">-0.8%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Contributors -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Top Contributors</h3>
+                <div class="space-y-3">
+                    <!-- @MAP: topContributors.map(contributor => ( -->
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-bind="contributor.name" data-mock="true">Apple Inc</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400" data-bind="contributor.weight" data-mock="true">4.2% allocation</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-success" data-bind="contributor.return" data-mock="true">+18.3%</div>
+                            <div class="text-sm text-success" data-bind="contributor.contribution" data-mock="true">+0.8%</div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">Microsoft Corp</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400" data-mock="true">3.8% allocation</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-success" data-mock="true">+15.1%</div>
+                            <div class="text-sm text-success" data-mock="true">+0.6%</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">Amazon.com Inc</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400" data-mock="true">3.1% allocation</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-success" data-mock="true">+12.7%</div>
+                            <div class="text-sm text-success" data-mock="true">+0.4%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Detractors -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Top Detractors</h3>
+                <div class="space-y-3">
+                    <!-- @MAP: topDetractors.map(detractor => ( -->
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-bind="detractor.name" data-mock="true">Tesla Inc</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400" data-bind="detractor.weight" data-mock="true">2.1% allocation</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-danger" data-bind="detractor.return" data-mock="true">-12.4%</div>
+                            <div class="text-sm text-danger" data-bind="detractor.contribution" data-mock="true">-0.3%</div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-dark-text" data-mock="true">Meta Platforms</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400" data-mock="true">1.8% allocation</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium text-danger" data-mock="true">-8.9%</div>
+                            <div class="text-sm text-danger" data-mock="true">-0.2%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: AttributionPage -->
+
+        <!-- @COMPONENT: RiskAllocationPage -->
+        <div id="risk-page" class="page-content hidden">
+            <!-- Current Allocation Chart -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Current Allocation</h3>
+                <div class="h-64 w-full">
+                    <canvas id="allocationChart" class="w-full h-full"></canvas>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <!-- @MAP: allocations.map(allocation => ( -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-primary rounded-full"></div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400" data-bind="allocation.label" data-mock="true">US Equities (62%)</span>
+                    </div>
+                    <!-- @END_MAP )) -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-success rounded-full"></div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400" data-mock="true">Intl Equities (23%)</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-warning rounded-full"></div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400" data-mock="true">Fixed Income (12%)</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-danger rounded-full"></div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400" data-mock="true">Alternatives (3%)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Metrics -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Risk Analysis</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Annualized Volatility</span>
+                        <span class="font-medium" data-bind="risk.volatility" data-mock="true">14.2%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Value at Risk (95%)</span>
+                        <span class="font-medium text-danger" data-bind="risk.var" data-mock="true">-2.3%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Maximum Drawdown</span>
+                        <span class="font-medium text-danger" data-bind="risk.maxDrawdown" data-mock="true">-8.4%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Beta vs S&P 500</span>
+                        <span class="font-medium" data-bind="risk.beta" data-mock="true">0.92</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400">Correlation vs S&P 500</span>
+                        <span class="font-medium" data-bind="risk.correlation" data-mock="true">0.87</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sector Allocation -->
+            <div class="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Top Sector Exposures</h3>
+                <div class="space-y-3">
+                    <!-- @MAP: sectors.map(sector => ( -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400" data-bind="sector.name" data-mock="true">Technology</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-primary h-2 rounded-full" style="width: 28%" data-bind="sector.percentage"></div>
+                            </div>
+                            <span class="font-medium text-sm w-10 text-right" data-bind="sector.percentage" data-mock="true">28%</span>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400" data-mock="true">Healthcare</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-success h-2 rounded-full" style="width: 16%"></div>
+                            </div>
+                            <span class="font-medium text-sm w-10 text-right" data-mock="true">16%</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400" data-mock="true">Financials</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-warning h-2 rounded-full" style="width: 13%"></div>
+                            </div>
+                            <span class="font-medium text-sm w-10 text-right" data-mock="true">13%</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 dark:text-gray-400" data-mock="true">Consumer Disc.</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-danger h-2 rounded-full" style="width: 11%"></div>
+                            </div>
+                            <span class="font-medium text-sm w-10 text-right" data-mock="true">11%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: RiskAllocationPage -->
+
+    </main>
+    <!-- @END_COMPONENT: MainContent -->
+
+    <!-- @COMPONENT: BottomNavigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-card border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+        <div class="max-w-md mx-auto">
+            <div class="flex justify-around">
+                <button data-event="click:showPage" data-page="overview" class="nav-item active flex flex-col items-center py-2 px-3 rounded-lg">
+                    <i class="fas fa-chart-line text-lg mb-1"></i>
+                    <span class="text-xs font-medium">Overview</span>
+                </button>
+                <button data-event="click:showPage" data-page="performance" class="nav-item flex flex-col items-center py-2 px-3 rounded-lg">
+                    <i class="fas fa-trending-up text-lg mb-1"></i>
+                    <span class="text-xs font-medium">Performance</span>
+                </button>
+                <button data-event="click:showPage" data-page="attribution" class="nav-item flex flex-col items-center py-2 px-3 rounded-lg">
+                    <i class="fas fa-pie-chart text-lg mb-1"></i>
+                    <span class="text-xs font-medium">Attribution</span>
+                </button>
+                <button data-event="click:showPage" data-page="risk" class="nav-item flex flex-col items-center py-2 px-3 rounded-lg">
+                    <i class="fas fa-shield-alt text-lg mb-1"></i>
+                    <span class="text-xs font-medium">Risk</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+    <!-- @END_COMPONENT: BottomNavigation -->
+
+    <script>
+        (function() {
+            // TODO: Implement business logic, API calls, and state management
+            
+            // Navigation functionality
+            const navItems = document.querySelectorAll('.nav-item');
+            const pages = document.querySelectorAll('.page-content');
+            
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const targetPage = this.getAttribute('data-page');
+                    
+                    // Update active nav item
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show target page
+                    pages.forEach(page => page.classList.add('hidden'));
+                    document.getElementById(targetPage + '-page').classList.remove('hidden');
+                    
+                    // Initialize charts for the active page
+                    initializeChartsForPage(targetPage);
+                });
+            });
+            
+            // Dark mode toggle
+            const toggleTheme = function() {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+            };
+            
+            // Initialize dark mode from localStorage
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.documentElement.classList.add('dark');
+            }
+            
+            document.querySelector('[data-event="click:toggleTheme"]').addEventListener('click', toggleTheme);
+            
+            // Initialize charts
+            let performanceChart, monthlyReturnsChart, allocationChart;
+            
+            function initializeChartsForPage(page) {
+                switch(page) {
+                    case 'overview':
+                        if (!performanceChart) {
+                            initPerformanceChart();
+                        }
+                        break;
+                    case 'performance':
+                        if (!monthlyReturnsChart) {
+                            initMonthlyReturnsChart();
+                        }
+                        break;
+                    case 'risk':
+                        if (!allocationChart) {
+                            initAllocationChart();
+                        }
+                        break;
+                }
+            }
+            
+            function initPerformanceChart() {
+                const ctx = document.getElementById('performanceChart');
+                if (!ctx) return;
+                
+                // Sample data - in production, this would come from API
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const portfolioData = [100, 102.1, 98.5, 103.2, 105.8, 108.1, 106.9, 111.3, 109.7, 112.4, 115.2, 112.4];
+                const benchmarkData = [100, 101.2, 97.8, 101.5, 103.2, 105.1, 104.2, 107.8, 106.1, 108.9, 110.1, 108.9];
+                
+                performanceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Portfolio',
+                            data: portfolioData,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3
+                        }, {
+                            label: 'S&P 500',
+                            data: benchmarkData,
+                            borderColor: '#9CA3AF',
+                            backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                grid: {
+                                    color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                                },
+                                ticks: {
+                                    color: document.documentElement.classList.contains('dark') ? '#9CA3AF' : '#6B7280'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                                },
+                                ticks: {
+                                    color: document.documentElement.classList.contains('dark') ? '#9CA3AF' : '#6B7280'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function initMonthlyReturnsChart() {
+                const ctx = document.getElementById('monthlyReturnsChart');
+                if (!ctx) return;
+                
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const returns = [2.1, -1.5, 4.7, 2.6, 2.7, -1.2, 4.2, -1.6, 2.7, 3.5, -2.8, 0.8];
+                
+                monthlyReturnsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Monthly Returns (%)',
+                            data: returns,
+                            backgroundColor: returns.map(r => r >= 0 ? '#10B981' : '#EF4444'),
+                            borderRadius: 4,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                grid: {
+                                    color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                                },
+                                ticks: {
+                                    color: document.documentElement.classList.contains('dark') ? '#9CA3AF' : '#6B7280'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    color: document.documentElement.classList.contains('dark') ? '#9CA3AF' : '#6B7280'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function initAllocationChart() {
+                const ctx = document.getElementById('allocationChart');
+                if (!ctx) return;
+                
+                allocationChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['US Equities', 'International Equities', 'Fixed Income', 'Alternatives'],
+                        datasets: [{
+                            data: [62, 23, 12, 3],
+                            backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+            }
+            
+            // Initialize overview page charts on load
+            initPerformanceChart();
+        })();
+    </script>
+
+    <style>
+        .nav-item {
+            @apply text-gray-500 dark:text-gray-400 transition-colors duration-200;
+        }
+        
+        .nav-item.active {
+            @apply text-primary bg-blue-50 dark:bg-blue-900/20;
+        }
+        
+        .nav-item:hover:not(.active) {
+            @apply text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700;
+        }
+    </style>
+</body>
+</html>
