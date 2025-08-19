@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from sqlalchemy import select, func, Numeric
+from sqlalchemy import select, func, Numeric, and_
 from pm.db.models import (
     SessionLocal,
     Portfolio,
@@ -69,19 +69,53 @@ def snapshot_portfolio_date(portfolio_id: int, as_of_date: date):
             .distinct()
         ).scalars().all()
 
-        # ── 3) 각 자산별 최신 종가 조회 ──
-        price_map = {}
-        for aid in asset_ids:
-            px = session.execute(
-                select(Price.close)
-                .where(
-                    Price.asset_id == aid,
-                    Price.date     <= as_of_date
+        # ── 3) 각 자산별 as_of_date 종가 조회 (최적화: 해당 날짜만 조회) ──
+        latest_prices = session.execute(
+            select(Price.asset_id, Price.close)
+            .where(
+                and_(
+                    Price.date == as_of_date,
+                    Price.asset_id.in_(asset_ids)
                 )
-                .order_by(Price.date.desc())
-                .limit(1)
-            ).scalar_one_or_none() or Decimal('0')
-            price_map[aid] = px
+            )
+        ).all()
+        
+        # price_map 생성
+        price_map = {asset_id: close for asset_id, close in latest_prices}
+        
+        # 가격이 없는 자산들에 대해 이전 영업일 가격 조회
+        missing_assets = [aid for aid in asset_ids if aid not in price_map]
+        if missing_assets:
+            # 각 자산별 이전 영업일 최신 가격 조회
+            fallback_date_subq = select(
+                Price.asset_id,
+                func.max(Price.date).label('latest_date')
+            ).where(
+                and_(
+                    Price.date < as_of_date,
+                    Price.asset_id.in_(missing_assets)
+                )
+            ).group_by(Price.asset_id).subquery()
+            
+            fallback_prices = session.execute(
+                select(Price.asset_id, Price.close)
+                .join(
+                    fallback_date_subq,
+                    and_(
+                        Price.asset_id == fallback_date_subq.c.asset_id,
+                        Price.date == fallback_date_subq.c.latest_date
+                    )
+                )
+            ).all()
+            
+            # fallback 가격을 price_map에 추가
+            for asset_id, close in fallback_prices:
+                price_map[asset_id] = close
+        
+        # 여전히 가격이 없는 자산은 0으로 설정
+        for aid in asset_ids:
+            if aid not in price_map:
+                price_map[aid] = Decimal('0')
 
         # ── 4) 자산별 상세 스냅샷 + total_market_value 집계 ──
         total_market_value = Decimal('0')

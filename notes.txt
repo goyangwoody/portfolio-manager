@@ -1,6 +1,10 @@
 
 <to-do>
 
+db쿼리 최적화
+
+대외보고용 웹 레이아웃/UI고안
+
 daily_metrics에 들어갈 것과 구조 확정
 
 
@@ -47,7 +51,8 @@ gui에 입력한 거래 -> 포트폴리오에 반영 (홈페이지 기준과 추
 상품군별 주간,월간,분기 간 수익 기여(asset_class_attribution_periodic)
 주간,월간, 분기간 Top/Bottom 기여자(attribution_highlight_periodic)
 상품군별 일간 수익률(asset_class_returns_daily)
-
+SP50 자산군/포트폴리오 반영
+gui에 수수료, 세금 입력 필드 추가
 
 1. 성과 기여도 분석
  - 상품별 수익 기여도: 각 종목이 포트폴리오 전체 수익에 얼마를 기여했는지 산출하여, Top 5 기여자·Top 5 저해자 리스트 작성

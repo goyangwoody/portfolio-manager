@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, Date, Enum, ForeignKey, UniqueConstraint, Numeric
 )
@@ -8,7 +9,18 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 try:
     # python-dotenv이 없는 환경에서도 동작하도록 Optional import
     from dotenv import load_dotenv  # type: ignore
-    load_dotenv()
+    
+    # 프로젝트 루트 디렉토리의 .env 파일 경로 찾기
+    # 현재 파일(models.py)에서 프로젝트 루트까지의 경로: src/pm/db/models.py -> ../../..
+    project_root = Path(__file__).parent.parent.parent.parent
+    env_path = project_root / '.env'
+    
+    # .env 파일이 존재하면 로드
+    if env_path.exists():
+        load_dotenv(env_path)
+    else:
+        # 프로젝트 루트에 .env가 없으면 기본 동작 (현재 디렉토리에서 찾기)
+        load_dotenv()
 except Exception:
     # dotenv 미설치 또는 로드 실패 시 무시하고 OS 환경변수만 사용
     pass

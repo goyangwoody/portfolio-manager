@@ -1,5 +1,4 @@
 beautifulsoup4==4.13.4
-beautifulsoup4==4.13.4
 certifi==2025.8.3
 cffi==1.17.1
 charset-normalizer==3.4.3
@@ -26,8 +25,10 @@ platformdirs==4.3.8
 protobuf==6.32.0
 pycparser==2.22
 pyluach==2.2.0
+PyMySQL==1.1.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
+python-dotenv==1.1.1
 pytz==2025.2
 requests==2.32.4
 six==1.17.0
