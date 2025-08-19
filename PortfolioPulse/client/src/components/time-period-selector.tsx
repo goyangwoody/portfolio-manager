@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, ChevronDown } from "lucide-react";
-import type { Portfolio } from "@shared/schema";
+import type { Portfolio } from "@shared/types";
 
 export type TimePeriod = "all" | "1w" | "2w" | "1m" | "custom";
 

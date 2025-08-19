@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, PerformanceData, Benchmark } from "@shared/schema";
+import type { Portfolio, PerformanceData, Benchmark } from "@shared/types";
+import { formatCurrency } from "@/lib/utils";
 
 export default function Performance() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const queryClient = useQueryClient();
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
@@ -17,18 +19,41 @@ export default function Performance() {
 
   const { data: performanceData, isLoading: performanceLoading } = useQuery<PerformanceData[]>({
     queryKey: ["/api/portfolios", portfolio?.id, "performance"],
+    queryFn: () => {
+      console.log(`📊 Fetching performance data for portfolio ${portfolio?.id}`);
+      return fetch(`/api/portfolios/${portfolio?.id}/performance`).then(res => res.json());
+    },
     enabled: !!portfolio?.id,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const { data: benchmarks } = useQuery<Benchmark[]>({
     queryKey: ["/api/portfolios", portfolio?.id, "benchmarks"],
+    queryFn: () => {
+      console.log(`📈 Fetching benchmarks for portfolio ${portfolio?.id}`);
+      return fetch(`/api/portfolios/${portfolio?.id}/benchmarks`).then(res => res.json());
+    },
     enabled: !!portfolio?.id,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
     setTimePeriod(period);
     // Here you would normally filter data based on the period
     console.log("Period changed:", period, customWeek, customMonth);
+  };
+
+  const handlePortfolioChange = (newPortfolio: Portfolio) => {
+    setCurrentPortfolio(newPortfolio);
+    // 포트폴리오 변경 시 관련 쿼리들 무효화
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "performance"] 
+    });
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "benchmarks"] 
+    });
   };
 
   if (!portfolio) {
@@ -43,8 +68,8 @@ export default function Performance() {
 
   // Generate daily returns data for the chart
   const dailyReturnsData = performanceData?.map((item, index) => {
-    const prevValue = index > 0 ? parseFloat(performanceData[index - 1].portfolioValue) : parseFloat(item.portfolioValue);
-    const currentValue = parseFloat(item.portfolioValue);
+    const prevValue = index > 0 ? performanceData[index - 1].portfolioValue : item.portfolioValue;
+    const currentValue = item.portfolioValue;
     const dailyReturn = index > 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0;
     
     return {
@@ -60,7 +85,7 @@ export default function Performance() {
         value={timePeriod}
         onChange={handleTimePeriodChange}
         className="mb-6"
-        onPortfolioChange={setCurrentPortfolio}
+        onPortfolioChange={handlePortfolioChange}
         currentPortfolio={portfolio}
       />
 

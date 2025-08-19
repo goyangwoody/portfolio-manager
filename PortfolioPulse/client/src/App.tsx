@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BottomNavigation } from "@/components/bottom-navigation";
-import { PortfolioTypeSelector } from "@/components/portfolio-type-selector";
 import Overview from "@/pages/overview";
 import Performance from "@/pages/performance";
 import Attribution from "@/pages/attribution";
@@ -15,25 +14,15 @@ import Assets from "@/pages/assets";
 import NotFound from "@/pages/not-found";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { Portfolio } from "@shared/schema";
+import type { Portfolio } from "@shared/types";
 
 function Header() {
-  const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | null>(null);
-  
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
   });
 
-  // Set initial portfolio when data loads
-  if (portfolios && portfolios.length > 0 && !currentPortfolio) {
-    setCurrentPortfolio(portfolios[0]);
-  }
-
-  const handlePortfolioChange = (portfolio: Portfolio) => {
-    setCurrentPortfolio(portfolio);
-    // Update other queries to use the new portfolio
-    queryClient.invalidateQueries();
-  };
+  // Use the first portfolio as default for display
+  const currentPortfolio = portfolios?.[0];
 
   return (
     <header className="bg-white dark:bg-dark-card shadow-sm px-4 py-3 sticky top-0 z-40">
@@ -48,12 +37,6 @@ function Header() {
             </p>
           </div>
           <ThemeToggle />
-        </div>
-        <div className="flex justify-center">
-          <PortfolioTypeSelector 
-            currentPortfolio={currentPortfolio || undefined}
-            onPortfolioChange={handlePortfolioChange}
-          />
         </div>
       </div>
     </header>

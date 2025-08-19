@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, AttributionData, RiskMetrics, SectorAllocation } from "@shared/schema";
+import type { Portfolio, AttributionData, RiskMetrics, SectorAllocation } from "@shared/types";
 
 export default function RiskAllocation() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const queryClient = useQueryClient();
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
@@ -18,6 +19,20 @@ export default function RiskAllocation() {
   const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
     setTimePeriod(period);
     console.log("Period changed:", period, customWeek, customMonth);
+  };
+
+  const handlePortfolioChange = (newPortfolio: Portfolio) => {
+    setCurrentPortfolio(newPortfolio);
+    // 포트폴리오 변경 시 리스크 관련 데이터 무효화
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "attribution"] 
+    });
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "risk"] 
+    });
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "sectors"] 
+    });
   };
 
   const { data: attributionData } = useQuery<AttributionData[]>({
@@ -49,7 +64,7 @@ export default function RiskAllocation() {
 
   const allocationChartData = attributionData?.map((item, index) => ({
     name: item.assetClass,
-    value: parseFloat(item.allocation),
+    value: item.allocation,
     color: COLORS[index % COLORS.length]
   })) || [];
 
@@ -60,7 +75,7 @@ export default function RiskAllocation() {
         value={timePeriod}
         onChange={handleTimePeriodChange}
         className="mb-6"
-        onPortfolioChange={setCurrentPortfolio}
+        onPortfolioChange={handlePortfolioChange}
         currentPortfolio={portfolio}
       />
 

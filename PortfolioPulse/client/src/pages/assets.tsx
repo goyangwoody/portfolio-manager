@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { X } from "lucide-react";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, Asset, AssetPerformanceData } from "@shared/schema";
+import type { Portfolio, Asset, AssetPerformanceData } from "@shared/types";
+import { formatCurrency } from "@/lib/utils";
 
 interface AssetDetailSheetProps {
   asset: Asset | null;
+  portfolio: Portfolio | undefined;
   isOpen: boolean;
   onClose: () => void;
 }
 
-function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
+function AssetDetailSheet({ asset, portfolio, isOpen, onClose }: AssetDetailSheetProps) {
   const { data: performanceData } = useQuery<AssetPerformanceData[]>({
     queryKey: ["/api/assets", asset?.id, "performance"],
     enabled: isOpen && !!asset?.id,
@@ -20,14 +22,14 @@ function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
 
   const chartData = performanceData?.map((item: AssetPerformanceData) => ({
     date: new Date(item.date).toLocaleDateString('en-US', { month: 'short' }),
-    price: parseFloat(item.price),
+    price: item.price,
   })) || [];
 
   if (!isOpen || !asset) return null;
 
   const isPositiveChange = parseFloat(asset.dayChange) >= 0;
-  const isPositivePL = parseFloat(asset.unrealizedPL) >= 0;
-  const isPositiveReturn = parseFloat(asset.cumulativeReturn) >= 0;
+  const isPositivePL = asset.unrealizedPnL >= 0;
+  const isPositiveReturn = asset.totalReturn >= 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
@@ -72,7 +74,7 @@ function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
                 Avg. Purchase Price
               </div>
               <div className="text-lg font-bold text-gray-900 dark:text-dark-text" data-testid="text-avg-price">
-                ${asset.averagePurchasePrice}
+                {portfolio ? formatCurrency(asset.avgPrice, portfolio.currency) : `$${asset.avgPrice}`}
               </div>
             </CardContent>
           </Card>
@@ -83,7 +85,7 @@ function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
                 Held Quantity
               </div>
               <div className="text-lg font-bold text-gray-900 dark:text-dark-text" data-testid="text-quantity">
-                {parseFloat(asset.quantity).toLocaleString()} shares
+                {asset.quantity.toLocaleString()} shares
               </div>
             </CardContent>
           </Card>
@@ -94,7 +96,7 @@ function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
                 Market Value
               </div>
               <div className="text-lg font-bold text-gray-900 dark:text-dark-text" data-testid="text-market-value">
-                ${(parseFloat(asset.currentPrice) * parseFloat(asset.quantity)).toLocaleString()}
+                {portfolio ? formatCurrency(asset.currentPrice * asset.quantity, portfolio.currency) : `$${(asset.currentPrice * asset.quantity).toLocaleString()}`}
               </div>
             </CardContent>
           </Card>
@@ -108,7 +110,7 @@ function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
                 Unrealized P/L
               </div>
               <div className={`text-lg font-bold ${isPositivePL ? 'text-success' : 'text-danger'}`} data-testid="text-unrealized-pl">
-                {isPositivePL ? '+' : ''}${asset.unrealizedPL}
+                {isPositivePL ? '+' : ''}{portfolio ? formatCurrency(Math.abs(asset.unrealizedPnL), portfolio.currency) : `$${Math.abs(asset.unrealizedPnL)}`}
               </div>
             </CardContent>
           </Card>
@@ -116,10 +118,10 @@ function AssetDetailSheet({ asset, isOpen, onClose }: AssetDetailSheetProps) {
           <Card>
             <CardContent className="p-4">
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                Cumulative Return
+                Total Return
               </div>
               <div className={`text-lg font-bold ${isPositiveReturn ? 'text-success' : 'text-danger'}`} data-testid="text-cumulative-return">
-                {isPositiveReturn ? '+' : ''}{asset.cumulativeReturn}%
+                {isPositiveReturn ? '+' : ''}{asset.totalReturn.toFixed(2)}%
               </div>
             </CardContent>
           </Card>
@@ -167,6 +169,7 @@ export default function Assets() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const queryClient = useQueryClient();
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
@@ -177,6 +180,14 @@ export default function Assets() {
   const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
     setTimePeriod(period);
     console.log("Period changed:", period, customWeek, customMonth);
+  };
+
+  const handlePortfolioChange = (newPortfolio: Portfolio) => {
+    setCurrentPortfolio(newPortfolio);
+    // 포트폴리오 변경 시 자산 데이터 무효화
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "assets"] 
+    });
   };
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
@@ -221,7 +232,7 @@ export default function Assets() {
         value={timePeriod}
         onChange={handleTimePeriodChange}
         className="mb-6"
-        onPortfolioChange={setCurrentPortfolio}
+        onPortfolioChange={handlePortfolioChange}
         currentPortfolio={portfolio}
       />
 
@@ -231,7 +242,7 @@ export default function Assets() {
 
       <div className="space-y-3">
         {assets?.map((asset, index) => {
-          const isPositiveChange = parseFloat(asset.dayChange) >= 0;
+          const isPositiveChange = parseFloat(asset.dayChange || "0") >= 0;
           
           return (
             <Card 
@@ -247,7 +258,7 @@ export default function Assets() {
                       {asset.name}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      Avg. ${asset.averagePurchasePrice}
+                      Avg. {portfolio ? formatCurrency(asset.avgPrice, portfolio.currency) : `$${asset.avgPrice}`}
                     </div>
                   </div>
                   <div className="text-right">
@@ -255,7 +266,7 @@ export default function Assets() {
                       {isPositiveChange ? '+' : ''}{asset.dayChange}%
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      ${asset.currentPrice}
+                      {portfolio ? formatCurrency(asset.currentPrice, portfolio.currency) : `$${asset.currentPrice}`}
                     </div>
                   </div>
                 </div>
@@ -271,6 +282,7 @@ export default function Assets() {
 
       <AssetDetailSheet 
         asset={selectedAsset}
+        portfolio={portfolio}
         isOpen={!!selectedAsset}
         onClose={() => setSelectedAsset(null)}
       />

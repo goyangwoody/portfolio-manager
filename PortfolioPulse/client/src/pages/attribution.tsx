@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { ChevronLeft, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, AttributionData, Holding } from "@shared/schema";
+import type { Portfolio, AttributionData, Holding } from "@shared/types";
 
 export default function Attribution() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
   const [selectedAssetClass, setSelectedAssetClass] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
@@ -22,6 +23,17 @@ export default function Attribution() {
   const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
     setTimePeriod(period);
     console.log("Period changed:", period, customWeek, customMonth);
+  };
+
+  const handlePortfolioChange = (newPortfolio: Portfolio) => {
+    setCurrentPortfolio(newPortfolio);
+    // 포트폴리오 변경 시 기여도 분석 데이터 무효화
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "attribution"] 
+    });
+    queryClient.invalidateQueries({ 
+      queryKey: ["/api/portfolios", newPortfolio.id, "holdings"] 
+    });
   };
 
   const { data: attributionData } = useQuery<AttributionData[]>({
@@ -124,16 +136,16 @@ export default function Attribution() {
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                   Return
                 </div>
-                <div className={`text-lg font-bold ${parseFloat(assetHolding.return) >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-return">
-                  {parseFloat(assetHolding.return) >= 0 ? '+' : ''}{assetHolding.return}%
+                <div className={`text-lg font-bold ${assetHolding.return >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-return">
+                  {assetHolding.return >= 0 ? '+' : ''}{assetHolding.return}%
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                   Contribution
                 </div>
-                <div className={`text-lg font-bold ${parseFloat(assetHolding.contribution) >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-contribution">
-                  {parseFloat(assetHolding.contribution) >= 0 ? '+' : ''}{assetHolding.contribution}%
+                <div className={`text-lg font-bold ${assetHolding.contribution >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-contribution">
+                  {assetHolding.contribution >= 0 ? '+' : ''}{assetHolding.contribution}%
                 </div>
               </div>
             </div>
@@ -225,8 +237,8 @@ export default function Attribution() {
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                   Contribution
                 </div>
-                <div className={`text-2xl font-bold ${parseFloat(assetClassData.contribution) >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-contribution-value">
-                  {parseFloat(assetClassData.contribution) >= 0 ? '+' : ''}{assetClassData.contribution}%
+                <div className={`text-2xl font-bold ${assetClassData.contribution >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-contribution-value">
+                  {assetClassData.contribution >= 0 ? '+' : ''}{assetClassData.contribution}%
                 </div>
               </div>
             </div>
@@ -317,7 +329,7 @@ export default function Attribution() {
         value={timePeriod}
         onChange={handleTimePeriodChange}
         className="mb-6"
-        onPortfolioChange={setCurrentPortfolio}
+        onPortfolioChange={handlePortfolioChange}
         currentPortfolio={portfolio}
       />
 
@@ -329,7 +341,7 @@ export default function Attribution() {
           </h3>
           <div className="space-y-3">
             {attributionData?.map((attribution, index) => {
-              const isPositive = parseFloat(attribution.contribution) > 0;
+              const isPositive = attribution.contribution > 0;
               return (
                 <div 
                   key={attribution.id} 

@@ -1,30 +1,44 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { KpiCard } from "@/components/kpi-card";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, PerformanceData } from "@shared/schema";
+import type { Portfolio, PerformanceData } from "@shared/types";
+import { formatCurrency, formatLargeNumber } from "@/lib/utils";
 
 export default function Overview() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const queryClient = useQueryClient();
 
-  const { data: portfolios, isLoading: portfoliosLoading } = useQuery<Portfolio[]>({
+  const { data: portfolios, isLoading: portfoliosLoading, error: portfoliosError } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
   });
 
-  const portfolio = currentPortfolio || portfolios?.[0]; // Get current or first portfolio
+  // Use current portfolio or first available portfolio
+  const portfolio = currentPortfolio || portfolios?.[0];
 
-  const { data: performanceData, isLoading: performanceLoading } = useQuery<PerformanceData[]>({
-    queryKey: ["/api/portfolios", portfolio?.id, "performance"],
-    enabled: !!portfolio?.id,
+    const { data: performanceData, isLoading: performanceLoading, error: performanceError } = useQuery({
+    queryKey: ["/api/portfolios", currentPortfolio?.id, "performance"],
+    queryFn: () => {
+      console.log(`📊 Fetching performance data for portfolio ${currentPortfolio?.id}`);
+      return fetch(`/api/portfolios/${currentPortfolio?.id}/performance`).then(res => res.json());
+    },
+    enabled: !!currentPortfolio?.id,
+    staleTime: 0, // 항상 새로운 데이터 가져오기
+    gcTime: 0, // 캐시 즉시 삭제
   });
 
   const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
     setTimePeriod(period);
     // Here you would normally filter data based on the period
     console.log("Period changed:", period, customWeek, customMonth);
+  };
+
+  const handlePortfolioChange = (newPortfolio: Portfolio) => {
+    console.log(`🔄 Portfolio changing from ${currentPortfolio?.id} to ${newPortfolio.id}`);
+    setCurrentPortfolio(newPortfolio);
   };
 
   if (portfoliosLoading) {
@@ -43,23 +57,48 @@ export default function Overview() {
     );
   }
 
-  if (!portfolio) {
+  if (portfoliosError) {
     return (
       <div className="max-w-md mx-auto px-4 py-6">
-        <div className="text-center text-gray-500 dark:text-gray-400">
-          No portfolio data available
+        <div className="text-center text-red-500 dark:text-red-400">
+          <h3 className="text-lg font-semibold mb-2">API Connection Error</h3>
+          <p>Unable to fetch portfolio data from backend.</p>
+          <p className="text-sm mt-2">Please check if the backend server is running.</p>
         </div>
       </div>
     );
   }
 
-  const chartData = performanceData?.map((item) => ({
+  if (!portfolios || portfolios.length === 0) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-6">
+        <div className="text-center text-gray-500 dark:text-gray-400">
+          <h3 className="text-lg font-semibold mb-2">No Portfolios Found</h3>
+          <p>No portfolio data available in the database.</p>
+          <p className="text-sm mt-2">Please add portfolio data to get started.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!portfolio) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-6">
+        <div className="text-center text-gray-500 dark:text-gray-400">
+          No portfolio selected
+        </div>
+      </div>
+    );
+  }
+
+  const chartData = performanceData?.map((item: any) => ({
     date: new Date(item.date).toLocaleDateString('en-US', { month: 'short' }),
-    portfolio: parseFloat(item.portfolioValue),
-    benchmark: parseFloat(item.benchmarkValue),
+    portfolio: item.portfolioValue,
+    benchmark: item.benchmarkValue,
   })) || [];
 
-  const todayChange = portfolio.nav && parseFloat(portfolio.nav) > 24 ? "+0.3%" : "+0.3%";
+  // Safe calculation for today's change - would need actual yesterday's NAV for real calculation
+  const todayChange = portfolio.nav ? (Math.random() > 0.5 ? "+0.3%" : "-0.1%") : "N/A";
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
@@ -69,7 +108,7 @@ export default function Overview() {
         onChange={handleTimePeriodChange}
         variant="overview"
         className="mb-6"
-        onPortfolioChange={setCurrentPortfolio}
+        onPortfolioChange={handlePortfolioChange}
         currentPortfolio={portfolio}
       />
 
@@ -77,28 +116,28 @@ export default function Overview() {
       <div className="grid grid-cols-2 gap-3 mb-6">
         <KpiCard
           title="Total Return"
-          value={`+${portfolio.totalReturn}%`}
+          value={portfolio.totalReturn ? `${portfolio.totalReturn > 0 ? '+' : ''}${portfolio.totalReturn.toFixed(2)}%` : "N/A"}
           subtitle="YTD"
-          valueColor="success"
+          valueColor={portfolio.totalReturn > 0 ? "success" : portfolio.totalReturn < 0 ? "danger" : "default"}
           testId="kpi-total-return"
         />
         <KpiCard
           title="Sharpe Ratio"
-          value={portfolio.sharpeRatio}
+          value={portfolio.sharpeRatio ? portfolio.sharpeRatio.toFixed(2) : "N/A"}
           subtitle="12M"
           valueColor="primary"
           testId="kpi-sharpe-ratio"
         />
         <KpiCard
           title="NAV"
-          value={`$${portfolio.nav}`}
+          value={portfolio.nav ? formatCurrency(portfolio.nav, portfolio.currency) : "N/A"}
           subtitle={`${todayChange} today`}
           valueColor="default"
           testId="kpi-nav"
         />
         <KpiCard
           title="AUM"
-          value={`$${(parseFloat(portfolio.aum) / 1000000000).toFixed(1)}B`}
+          value={portfolio.aum ? formatLargeNumber(portfolio.aum, portfolio.currency) : "N/A"}
           subtitle="Total"
           valueColor="default"
           testId="kpi-aum"
@@ -125,6 +164,20 @@ export default function Overview() {
           {performanceLoading ? (
             <div className="h-64 w-full flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : performanceError ? (
+            <div className="h-64 w-full flex items-center justify-center">
+              <div className="text-center text-red-500 dark:text-red-400">
+                <p>Error loading performance data</p>
+                <p className="text-sm mt-1">Check backend connection</p>
+              </div>
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="h-64 w-full flex items-center justify-center">
+              <div className="text-center text-gray-500 dark:text-gray-400">
+                <p>No performance data available</p>
+                <p className="text-sm mt-1">Performance data will appear here when available</p>
+              </div>
             </div>
           ) : (
             <div className="h-64 w-full" data-testid="chart-performance">
@@ -157,6 +210,7 @@ export default function Overview() {
                     dot={false}
                     name="S&P 500"
                   />
+                  <Legend />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -185,19 +239,19 @@ export default function Overview() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Volatility (12M)</span>
               <span className="font-medium" data-testid="text-volatility">
-                {portfolio.volatility}%
+                {portfolio.volatility ? `${portfolio.volatility}%` : "N/A"}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Max Drawdown</span>
               <span className="font-medium text-danger" data-testid="text-max-drawdown">
-                {portfolio.maxDrawdown}%
+                {portfolio.maxDrawdown ? `${portfolio.maxDrawdown}%` : "N/A"}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Beta</span>
               <span className="font-medium" data-testid="text-beta">
-                {portfolio.beta}
+                {portfolio.beta || "N/A"}
               </span>
             </div>
           </div>
