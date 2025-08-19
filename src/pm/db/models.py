@@ -48,6 +48,7 @@ class Portfolio(Base):
     cash_balance   = Column(Numeric(20,4), nullable=False, default=1000000000.0)
     # 관련 관계
     transactions = relationship("Transaction", back_populates="portfolio")
+    performance_data = relationship("PortfolioPerformance", back_populates="portfolio")
     positions_daily = relationship(
         "PortfolioPositionDaily",
         back_populates="portfolio",
@@ -296,6 +297,73 @@ engine = create_engine(DATABASE_URL, echo=SQLALCHEMY_ECHO)
 
 # 세션 클래스 생성
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Portfolio Analytics 관련 추가 테이블들
+class PortfolioPerformance(Base):
+    __tablename__ = 'portfolio_performance'
+    
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
+    date = Column(Date, nullable=False)
+    portfolio_value = Column(Numeric(15, 2), nullable=False)
+    benchmark_value = Column(Numeric(15, 2), nullable=False)
+    daily_return = Column(Numeric(8, 4))
+    monthly_return = Column(Numeric(8, 4))
+    quarterly_return = Column(Numeric(8, 4))
+    
+    # Relationship
+    portfolio = relationship("Portfolio", back_populates="performance_data")
+    
+    __table_args__ = (UniqueConstraint('portfolio_id', 'date', name='unique_portfolio_date'),)
+
+class PortfolioAttribution(Base):
+    __tablename__ = 'portfolio_attribution'
+    
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
+    asset_class = Column(String(50), nullable=False)
+    allocation = Column(Numeric(6, 3), nullable=False)
+    contribution = Column(Numeric(8, 4), nullable=False)
+    date = Column(Date, nullable=False)
+    
+    # Relationship
+    portfolio = relationship("Portfolio")
+
+class PortfolioRiskMetrics(Base):
+    __tablename__ = 'portfolio_risk_metrics'
+    
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
+    date = Column(Date, nullable=False)
+    var_95 = Column(Numeric(8, 4), nullable=False)
+    var_99 = Column(Numeric(8, 4), nullable=False)
+    expected_shortfall = Column(Numeric(8, 4), nullable=False)
+    tracking_error = Column(Numeric(6, 3), nullable=False)
+    information_ratio = Column(Numeric(6, 3), nullable=False)
+    sharpe_ratio = Column(Numeric(6, 3), nullable=False)
+    volatility = Column(Numeric(6, 3), nullable=False)
+    max_drawdown = Column(Numeric(6, 3), nullable=False)
+    beta = Column(Numeric(6, 3), nullable=False)
+    
+    # Relationship
+    portfolio = relationship("Portfolio")
+
+class PortfolioSectorAllocation(Base):
+    __tablename__ = 'portfolio_sector_allocation'
+    
+    id = Column(Integer, primary_key=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
+    sector = Column(String(100), nullable=False)
+    allocation = Column(Numeric(6, 3), nullable=False)
+    contribution = Column(Numeric(8, 4), nullable=False)
+    date = Column(Date, nullable=False)
+    
+    # Relationship
+    portfolio = relationship("Portfolio")
+
+# Portfolio 모델에 relationship 추가
+# (기존 Portfolio 클래스에 추가할 relationship)
+# performance_data = relationship("PortfolioPerformance", back_populates="portfolio")
 
 # 테이블 생성 (없을 경우)
 Base.metadata.create_all(bind=engine)
