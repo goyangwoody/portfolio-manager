@@ -1,0 +1,14 @@
+# secrets
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# node (혹시 섞여 있다면)
+node_modules/
+
+# tests/docs (선택)
+tests/
+docs/

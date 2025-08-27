@@ -33,3 +33,25 @@ replacements.txt
 
 # Jupyter
 .ipynb_checkpoints/
+
+*.pem
+.venv/
+*.pyc
+
+node_modules/
+PortfolioPulse/node_modules/
+
+# frontend build outputs
+dist/
+PortfolioPulse/dist/
+
+# local/os
+.DS_Store
+Thumbs.db
+
+# docker artifacts (선택)
+web_build/
+
+# frontend build outputs
+dist/
+PortfolioPulse/dist/
