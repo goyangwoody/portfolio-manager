@@ -11,15 +11,25 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+    
+    
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+            node-version: 20
+            cache: 'npm'
+            cache-dependency-path: PortfolioPulse/package-lock.json
 
       # 프론트엔드 빌드 (폴더명이 PortfolioPulse일 때)
       - name: Build frontend
         working-directory: PortfolioPulse
         run: |
-          npm ci
-          npm run build
-          mkdir -p ../web_build
-          cp -r dist/* ../web_build/
+            npm cache clean --force
+            rm -f package-lock.json
+            npm install
+            npm run build
+        env:
+            CI: "true"
 
       # SSH 설정 (EC2 접속용 키)
       - name: Setup SSH
