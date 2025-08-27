@@ -3,7 +3,7 @@ version: "3.9"
 services:
   api:
     build:
-      context: 
+      context: .
       dockerfile: /api/Dockerfile
     container_name: portfolio_api
     restart: always
