@@ -31,8 +31,6 @@ services:
       - "80:80"     # HTTP
       - "443:443"   # HTTPS (인증서 발급 후 활성)
     volumes:
-      # 메인 설정 파일(nginx.conf가 conf.d/*.conf를 include 하도록)
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       # 서버블록(가상호스트)들
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       # 정적 빌드(리액트 등) 배포 폴더(필요 없으면 제거)
