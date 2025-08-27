@@ -31,32 +31,34 @@ jobs:
         env:
             CI: "true"
 
-      # SSH 설정 (EC2 접속용 키)
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+      # 키 파일로 복원
+      - name: Write private key
+        run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.EC2_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/github_deploy
+            chmod 600 ~/.ssh/github_deploy
 
+      # known_hosts 등록
       - name: Add known_hosts
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+            ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      # EC2에 프로젝트 동기화
+      # rsync 시 -e 로 키 지정
       - name: Rsync project to EC2
         run: |
-          rsync -az --delete \
+            rsync -az --delete \
             --exclude ".git" --exclude ".github" \
             --exclude ".env" --exclude ".venv" \
             --exclude "node_modules" --exclude "PortfolioPulse/node_modules" \
+            -e "ssh -i ~/.ssh/github_deploy" \
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_PATH }}/
 
-      # Docker Compose 빌드 & 재시작
-      - name: Restart docker compose on EC2
+      # 서버에서 명령 실행 시에도 -i 지정
+      - name: Restart compose on EC2
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          set -e
-          cd ${{ secrets.EC2_PATH }}
-          docker compose up -d --build
-          docker image prune -f
-          EOF
+            ssh -i ~/.ssh/github_deploy ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+            docker compose up -d --build
+            docker image prune -f
+            EOF
