@@ -45,7 +45,6 @@ class Portfolio(Base):
     cash_balance   = Column(Numeric(20,4), nullable=False, default=1000000000.0)
     # 관련 관계
     transactions = relationship("Transaction", back_populates="portfolio")
-    performance_data = relationship("PortfolioPerformance", back_populates="portfolio")
     positions_daily = relationship(
         "PortfolioPositionDaily",
         back_populates="portfolio",
@@ -58,17 +57,6 @@ class Portfolio(Base):
     )
     asset_class_returns = relationship(
         "AssetClassReturnDaily",
-        back_populates="portfolio",
-        cascade="all, delete-orphan"
-    )
-    # 일별 자산/자산군 NAV 관련 관계
-    asset_nav_daily = relationship(
-        "AssetNavDaily",
-        back_populates="portfolio",
-        cascade="all, delete-orphan"
-    )
-    asset_class_nav_daily = relationship(
-        "AssetClassNavDaily",
         back_populates="portfolio",
         cascade="all, delete-orphan"
     )
@@ -173,54 +161,6 @@ class AssetClassReturnDaily(Base):
                         name='uq_assetclass_ret_port_date_class'),
     )
 
-# 기간별 자산 기여도 테이블 모델
-# 일별 자산 NAV 테이블 모델
-class AssetNavDaily(Base):
-    """일별 자산별 NAV 및 비중"""
-    __tablename__ = 'asset_nav_daily'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id', ondelete="CASCADE"), nullable=False)
-    as_of_date = Column(Date, nullable=False)
-    asset_id = Column(Integer, ForeignKey('assets.id', ondelete="CASCADE"), nullable=False)
-    
-    nav = Column(Numeric(20,4), nullable=False)           # 해당 자산의 NAV
-    weight = Column(Numeric(10,6), nullable=False)        # 포트폴리오 내 비중 (%)
-    market_value = Column(Numeric(20,4), nullable=False)  # 시장가치
-    quantity = Column(Numeric(20,8), nullable=False)      # 보유수량
-    avg_cost = Column(Numeric(20,8), nullable=False)      # 평균단가
-    
-    # 관계 설정
-    portfolio = relationship("Portfolio", back_populates="asset_nav_daily")
-    asset = relationship("Asset")
-    
-    __table_args__ = (
-        UniqueConstraint('portfolio_id', 'as_of_date', 'asset_id',
-                        name='uq_asset_nav_daily'),
-    )
-
-# 일별 자산군 NAV 테이블 모델
-class AssetClassNavDaily(Base):
-    """일별 자산군별 NAV 및 비중"""
-    __tablename__ = 'asset_class_nav_daily'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id', ondelete="CASCADE"), nullable=False)
-    as_of_date = Column(Date, nullable=False)
-    asset_class = Column(Enum(*ASSET_CLASS_ENUM, name='asset_class_enum'), nullable=False)
-    
-    nav = Column(Numeric(20,4), nullable=False)           # 해당 자산군의 총 NAV
-    weight = Column(Numeric(10,6), nullable=False)        # 포트폴리오 내 비중 (%)
-    market_value = Column(Numeric(20,4), nullable=False)  # 해당 자산군의 총 시장가치
-    asset_count = Column(Integer, nullable=False)         # 해당 자산군 내 자산 개수
-    
-    # 관계 설정
-    portfolio = relationship("Portfolio", back_populates="asset_class_nav_daily")
-    
-    __table_args__ = (
-        UniqueConstraint('portfolio_id', 'as_of_date', 'asset_class',
-                        name='uq_asset_class_nav_daily'),
-    )
 
 """데이터베이스 연결 설정
 민감정보는 환경변수(.env)로 분리합니다.
@@ -232,17 +172,17 @@ class AssetClassNavDaily(Base):
 # 우선 순위 1: DATABASE_URL이 직접 지정된 경우 사용
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# 우선 순위 2: 개별 설정으로 구성
-if not DATABASE_URL:
-    DB_DIALECT = os.getenv("DB_DIALECT", "mysql+pymysql")
-    DB_USER = os.getenv("DB_USER", "root")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-    DB_HOST = os.getenv("DB_HOST", "localhost")
-    DB_PORT = os.getenv("DB_PORT")  # 없으면 기본 포트 사용
-    DB_NAME = os.getenv("DB_NAME", "portfolio_manager")
+# # 우선 순위 2: 개별 설정으로 구성
+# if not DATABASE_URL:
+#     DB_DIALECT = os.getenv("DB_DIALECT", "mysql+pymysql")
+#     DB_USER = os.getenv("DB_USER", "root")
+#     DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+#     DB_HOST = os.getenv("DB_HOST", "localhost")
+#     DB_PORT = os.getenv("DB_PORT")  # 없으면 기본 포트 사용
+#     DB_NAME = os.getenv("DB_NAME", "portfolio_manager")
 
-    host_part = f"{DB_HOST}:{DB_PORT}" if DB_PORT else DB_HOST
-    DATABASE_URL = f"{DB_DIALECT}://{DB_USER}:{DB_PASSWORD}@{host_part}/{DB_NAME}"
+#     host_part = f"{DB_HOST}:{DB_PORT}" if DB_PORT else DB_HOST
+#     DATABASE_URL = f"{DB_DIALECT}://{DB_USER}:{DB_PASSWORD}@{host_part}/{DB_NAME}"
 
 # SQLAlchemy 로그 출력 제어 (기본 False)
 SQLALCHEMY_ECHO = os.getenv("SQLALCHEMY_ECHO", "false").lower() == "true"
@@ -251,73 +191,6 @@ engine = create_engine(DATABASE_URL, echo=SQLALCHEMY_ECHO)
 
 # 세션 클래스 생성
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Portfolio Analytics 관련 추가 테이블들
-class PortfolioPerformance(Base):
-    __tablename__ = 'portfolio_performance'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    date = Column(Date, nullable=False)
-    portfolio_value = Column(Numeric(15, 2), nullable=False)
-    benchmark_value = Column(Numeric(15, 2), nullable=False)
-    daily_return = Column(Numeric(8, 4))
-    monthly_return = Column(Numeric(8, 4))
-    quarterly_return = Column(Numeric(8, 4))
-    
-    # Relationship
-    portfolio = relationship("Portfolio", back_populates="performance_data")
-    
-    __table_args__ = (UniqueConstraint('portfolio_id', 'date', name='unique_portfolio_date'),)
-
-class PortfolioAttribution(Base):
-    __tablename__ = 'portfolio_attribution'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    asset_class = Column(String(50), nullable=False)
-    allocation = Column(Numeric(6, 3), nullable=False)
-    contribution = Column(Numeric(8, 4), nullable=False)
-    date = Column(Date, nullable=False)
-    
-    # Relationship
-    portfolio = relationship("Portfolio")
-
-class PortfolioRiskMetrics(Base):
-    __tablename__ = 'portfolio_risk_metrics'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    date = Column(Date, nullable=False)
-    var_95 = Column(Numeric(8, 4), nullable=False)
-    var_99 = Column(Numeric(8, 4), nullable=False)
-    expected_shortfall = Column(Numeric(8, 4), nullable=False)
-    tracking_error = Column(Numeric(6, 3), nullable=False)
-    information_ratio = Column(Numeric(6, 3), nullable=False)
-    sharpe_ratio = Column(Numeric(6, 3), nullable=False)
-    volatility = Column(Numeric(6, 3), nullable=False)
-    max_drawdown = Column(Numeric(6, 3), nullable=False)
-    beta = Column(Numeric(6, 3), nullable=False)
-    
-    # Relationship
-    portfolio = relationship("Portfolio")
-
-class PortfolioSectorAllocation(Base):
-    __tablename__ = 'portfolio_sector_allocation'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    sector = Column(String(100), nullable=False)
-    allocation = Column(Numeric(6, 3), nullable=False)
-    contribution = Column(Numeric(8, 4), nullable=False)
-    date = Column(Date, nullable=False)
-    
-    # Relationship
-    portfolio = relationship("Portfolio")
-
-# Portfolio 모델에 relationship 추가
-# (기존 Portfolio 클래스에 추가할 relationship)
-# performance_data = relationship("PortfolioPerformance", back_populates="portfolio")
 
 # 테이블 생성 (없을 경우)
 Base.metadata.create_all(bind=engine)

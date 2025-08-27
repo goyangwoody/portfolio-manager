@@ -47,9 +47,7 @@ Value at Risk (VaR)
 비영업일 따로 처리
 decimal vs float
 gui에 입력한 거래 -> 포트폴리오에 반영 (홈페이지 기준과 추적오차 없애기)
-상품별 주간,월간,분기 간 수익 기여(asset_attribution_periodic)
-상품군별 주간,월간,분기 간 수익 기여(asset_class_attribution_periodic)
-주간,월간, 분기간 Top/Bottom 기여자(attribution_highlight_periodic)
+
 상품군별 일간 수익률(asset_class_returns_daily)
 SP50 자산군/포트폴리오 반영
 gui에 수수료, 세금 입력 필드 추가
@@ -63,7 +61,11 @@ as_of_date이전 모든 날짜를 가져오고 그 중 가장 최신 날짜의 �
  - 상품별 수익 기여도: 각 종목이 포트폴리오 전체 수익에 얼마를 기여했는지 산출하여, Top 5 기여자·Top 5 저해자 리스트 작성
  -자산군별 수익 기여도: 자산군별(예: 국내주식, 해외채권, 대체투자 등) 수익 기여도를 백분율로 파악
 
+<삭제>
 
+상품별 주간,월간,분기 간 수익 기여(asset_attribution_periodic)
+상품군별 주간,월간,분기 간 수익 기여(asset_class_attribution_periodic)
+주간,월간, 분기간 Top/Bottom 기여자(attribution_highlight_periodic)
 -----------------------------------------------------------------
 (tkinter or react?)
 

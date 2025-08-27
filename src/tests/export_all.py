@@ -16,7 +16,7 @@ from pm.db.models import engine  # engine 은 SQLAlchemy 2.0 Engine
 # ]
 
 DEFAULT_TABLES = [
-    "prices"
+    "transactions"
 ]
 def export_table(table_name, out_dir, chunksize=None, gzip=False):
     path = os.path.join(out_dir, f"{table_name}.csv" + (".gz" if gzip else ""))
