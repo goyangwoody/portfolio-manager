@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y gcc default-libmysqlclient-dev curl && rm -rf /var/lib/apt/lists/*
 
 # 루트의 requirements.txt를 먼저 복사/설치
-COPY requirements.txt .
+COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 백엔드와 공유모듈 복사
