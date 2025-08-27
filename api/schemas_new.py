@@ -13,6 +13,7 @@ from enum import Enum
 
 class TimePeriod(str, Enum):
     """분석 기간 옵션"""
+    ALL = "all"                 # 전체 기간 (= INCEPTION)
     INCEPTION = "inception"      # 투자 시작부터
     YTD = "ytd"                 # 연초부터
     ONE_MONTH = "1m"            # 1개월
@@ -68,8 +69,41 @@ class PortfoliosResponse(BaseModel):
 # PERFORMANCE SCHEMAS
 # ================================
 
+class RecentReturnData(BaseModel):
+    """최근 수익률 데이터 (All Time용)"""
+    daily_return: Optional[float] = Field(None, description="1일 수익률 (%)")
+    weekly_return: Optional[float] = Field(None, description="1주 수익률 (%)")
+    monthly_return: Optional[float] = Field(None, description="1개월 수익률 (%)")
+
+class DailyReturnPoint(BaseModel):
+    """일별 수익률 차트 포인트"""
+    date: date
+    daily_return: float = Field(description="일별 수익률 (%)")
+
+class BenchmarkReturn(BaseModel):
+    """벤치마크 수익률 데이터"""
+    name: str = Field(description="벤치마크 이름")
+    return_pct: float = Field(description="수익률 (%)")
+    outperformance: float = Field(description="아웃퍼포먼스 (%)")
+
+class PerformanceAllTimeResponse(BaseModel):
+    """All Time 성과 데이터 응답"""
+    recent_returns: RecentReturnData = Field(description="최근 1일/1주/1개월 수익률")
+    recent_week_daily_returns: List[DailyReturnPoint] = Field(description="최근 주간 일별 수익률")
+    daily_returns: List[DailyReturnPoint] = Field(description="차트 기간에 따른 일별 수익률")
+    benchmark_returns: List[BenchmarkReturn] = Field(description="벤치마크 대비 수익률")
+
+class PerformanceCustomPeriodResponse(BaseModel):
+    """Custom Period 성과 데이터 응답"""
+    cumulative_return: float = Field(description="기간 누적 수익률 (%)")
+    daily_returns: List[DailyReturnPoint] = Field(description="기간 중 일별 수익률")
+    benchmark_returns: List[BenchmarkReturn] = Field(description="기간 중 벤치마크 대비 수익률")
+    start_date: date = Field(description="분석 시작일")
+    end_date: date = Field(description="분석 종료일")
+    period_type: str = Field(description="기간 타입 (week/month)")
+
 class PerformanceDataPoint(BaseModel):
-    """성과 차트용 개별 데이터 포인트"""
+    """성과 차트용 개별 데이터 포인트 (다른 기간용)"""
     date: date
     portfolio_value: float = Field(description="포트폴리오 가치")
     benchmark_value: Optional[float] = Field(None, description="벤치마크 가치")
@@ -79,7 +113,7 @@ class PerformanceDataPoint(BaseModel):
         from_attributes = True
 
 class PerformanceResponse(BaseModel):
-    """성과 데이터 응답"""
+    """성과 데이터 응답 (일반 기간용)"""
     data: List[PerformanceDataPoint]
     period: TimePeriod
     start_date: date

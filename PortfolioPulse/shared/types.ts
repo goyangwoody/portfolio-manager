@@ -48,6 +48,49 @@ export interface Portfolio {
 // PERFORMANCE TYPES
 // ================================
 
+// ================================
+// PERFORMANCE TYPES
+// ================================
+
+// 최근 수익률 데이터
+export interface RecentReturnData {
+  daily_return?: number;    // 1일 수익률 (%)
+  weekly_return?: number;   // 1주 수익률 (%)
+  monthly_return?: number;  // 1개월 수익률 (%)
+}
+
+// 일별 수익률 차트 포인트
+export interface DailyReturnPoint {
+  date: string;             // Date -> string in JSON
+  daily_return: number;     // 일별 수익률 (%)
+}
+
+// 벤치마크 수익률 데이터
+export interface BenchmarkReturn {
+  name: string;             // 벤치마크 이름
+  return_pct: number;       // 수익률 (%)
+  outperformance: number;   // 아웃퍼포먼스 (%)
+}
+
+// All Time 성과 데이터 응답
+export interface PerformanceAllTimeResponse {
+  recent_returns: RecentReturnData;
+  recent_week_daily_returns: DailyReturnPoint[];
+  daily_returns: DailyReturnPoint[];  // chart_period에 따른 일별 수익률 데이터
+  benchmark_returns: BenchmarkReturn[];
+}
+
+// Custom Period 성과 데이터 응답
+export interface PerformanceCustomPeriodResponse {
+  cumulative_return: number;       // 기간 누적 수익률 (%)
+  daily_returns: DailyReturnPoint[]; // 기간 중 일별 수익률
+  benchmark_returns: BenchmarkReturn[]; // 기간 중 벤치마크 대비 수익률
+  start_date: string;              // 분석 시작일 (Date -> string in JSON)
+  end_date: string;                // 분석 종료일 (Date -> string in JSON)
+  period_type: string;             // 기간 타입 (week/month)
+}
+
+// 기존 Performance 데이터 (다른 기간용)
 export interface PerformanceData {
   date: string;             // Date -> string in JSON
   portfolio_value: number;
@@ -57,6 +100,14 @@ export interface PerformanceData {
   // 기존 필드명과의 호환성
   portfolioValue: number;
   benchmarkValue: number;
+}
+
+// 벤치마크 데이터 (기존 코드 호환성)
+export interface Benchmark {
+  id: string;
+  name: string;
+  return: number;           // 수익률 (%)
+  outperformance: number;   // 아웃퍼포먼스 (%)
 }
 
 // ================================
