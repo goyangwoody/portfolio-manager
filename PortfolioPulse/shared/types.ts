@@ -16,7 +16,7 @@ export interface PortfolioSummaryResponse extends PortfolioListResponse {
   total_return?: number;    // 총 수익률 (%)
   sharpe_ratio?: number;    // 샤프 비율
   nav?: number;             // 순자산가치
-  aum?: number;             // 총 자산 관리 규모
+  cash_ratio?: number;      // 현금 비중 (%)
 }
 
 // 기존 Portfolio 인터페이스를 PortfolioSummaryResponse로 매핑
@@ -29,17 +29,19 @@ export interface Portfolio {
   total_return?: number;
   sharpe_ratio?: number;
   nav?: number;
-  aum?: number;
+  cash_ratio?: number;
   
   // 기존 코드와의 호환성을 위한 별칭
   totalReturn: number;
   sharpeRatio: number;
-  
-  // Overview 페이지에서 사용하는 추가 필드들 (선택적)
-  volatility?: number;
-  maxDrawdown?: number;
-  beta?: number;
   cashRatio?: number;       // 현금 비중 (%)
+  
+  // 차트 데이터 (Overview 페이지용)
+  chartData?: Array<{
+    date: string;
+    nav: number;
+    benchmark: number;
+  }>;
 }
 
 // ================================
