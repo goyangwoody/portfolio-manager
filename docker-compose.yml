@@ -2,9 +2,7 @@ version: "3.9"
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
+    build: ./api
     container_name: portfolio_api
     restart: always
     env_file: .env
