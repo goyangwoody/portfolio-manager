@@ -8,24 +8,51 @@ services:
     container_name: portfolio_api
     restart: always
     env_file: .env
-    ports:
-      - "8000:8000"          # 내부 확인용 (Nginx 통해서만 쓰면 생략 가능)
+    # 외부로는 공개하지 않고 nginx 통해 접근 (내부 포트만 노출)
+    expose:
+      - "8000"
     networks:
       - appnet
+    healthcheck:
+      # /health 엔드포인트가 200을 주도록 FastAPI에 간단히 추가 권장
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   nginx:
     image: nginx:1.27
     container_name: portfolio_nginx
     restart: always
     depends_on:
-      - api
+      - api   # (compose v2+에서는 healthcheck 조건도 가능)
     ports:
-      - "80:80"              # HTTP
-      - "443:443"            # HTTPS (추후 certbot 적용시 사용)
+      - "80:80"     # HTTP
+      - "443:443"   # HTTPS (인증서 발급 후 활성)
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # 메인 설정 파일(nginx.conf가 conf.d/*.conf를 include 하도록)
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # 서버블록(가상호스트)들
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # 정적 빌드(리액트 등) 배포 폴더(필요 없으면 제거)
       - ./web_build:/usr/share/nginx/html:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro   # HTTPS 인증서 경로
+      # 인증서/챌린지 공유 볼륨 (certbot 컨테이너와 동일 경로 사용)
+      - ./certbot/www:/var/www/certbot:rw
+      - ./certbot/letsencrypt:/etc/letsencrypt:rw
+    networks:
+      - appnet
+
+  # 인증서 발급/갱신용 사이드카(명령 내릴 때만 사용)
+  certbot:
+    image: certbot/certbot
+    container_name: portfolio_certbot
+    # 필요 시에만 실행하므로 평소엔 꺼둬도 됨
+    volumes:
+      - ./certbot/www:/var/www/certbot:rw
+      - ./certbot/letsencrypt:/etc/letsencrypt:rw
+    entrypoint: /bin/sh
+    command: -c "sleep infinity"
     networks:
       - appnet
 
