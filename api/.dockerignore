@@ -1,14 +1,13 @@
-# secrets
+.git/
 .env
-
-# python
 .venv/
 __pycache__/
 *.pyc
-
-# node (혹시 섞여 있다면)
 node_modules/
-
+PortfolioPulse/node_modules/
+dist/
+PortfolioPulse/dist/
 # tests/docs (선택)
 tests/
 docs/
+.git/
