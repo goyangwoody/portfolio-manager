@@ -29,9 +29,6 @@ except Exception:
 Base = declarative_base()
 
 # ENUM 정의
-PERIOD_TYPE_ENUM = ('WEEK', 'MONTH', 'QUARTER')
-RANK_TYPE_ENUM = ('TOP', 'BOTTOM')
-
 ASSET_CLASS_ENUM = (
     'SP50', 'FXCOM', 'GL_INDEX', 'GL_SECTOR', 'KR_INDEX', 'KR_SECTOR', 'MONEY_ULTRA_SHORT', 'GL_BOND_CORP', 'GL_BOND_AGG', 'KR_BOND_CORP', 'KR_BOND_AGG'
     )
@@ -64,19 +61,14 @@ class Portfolio(Base):
         back_populates="portfolio",
         cascade="all, delete-orphan"
     )
-    # 기여도 분석 관련 관계
-    asset_attributions = relationship(
-        "AssetAttributionPeriodic",
+    # 일별 자산/자산군 NAV 관련 관계
+    asset_nav_daily = relationship(
+        "AssetNavDaily",
         back_populates="portfolio",
         cascade="all, delete-orphan"
     )
-    class_attributions = relationship(
-        "AssetClassAttributionPeriodic",
-        back_populates="portfolio",
-        cascade="all, delete-orphan"
-    )
-    attribution_highlights = relationship(
-        "AttributionHighlightsPeriodic",
+    asset_class_nav_daily = relationship(
+        "AssetClassNavDaily",
         back_populates="portfolio",
         cascade="all, delete-orphan"
     )
@@ -182,90 +174,52 @@ class AssetClassReturnDaily(Base):
     )
 
 # 기간별 자산 기여도 테이블 모델
-class AssetAttributionPeriodic(Base):
-    """기간별 자산 단위 기여도 분석 결과"""
-    __tablename__ = 'asset_attribution_periodic'
+# 일별 자산 NAV 테이블 모델
+class AssetNavDaily(Base):
+    """일별 자산별 NAV 및 비중"""
+    __tablename__ = 'asset_nav_daily'
     
     id = Column(Integer, primary_key=True)
     portfolio_id = Column(Integer, ForeignKey('portfolios.id', ondelete="CASCADE"), nullable=False)
-    period_type = Column(Enum(*PERIOD_TYPE_ENUM, name='period_type_enum'), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
+    as_of_date = Column(Date, nullable=False)
     asset_id = Column(Integer, ForeignKey('assets.id', ondelete="CASCADE"), nullable=False)
     
-    start_nav = Column(Numeric(20,4), nullable=False)
-    end_nav = Column(Numeric(20,4), nullable=False)
-    avg_weight = Column(Numeric(10,6), nullable=False)
-    total_return = Column(Numeric(10,6), nullable=False)
-    contribution = Column(Numeric(10,6), nullable=False)
-    selection_effect = Column(Numeric(10,6))
-    allocation_effect = Column(Numeric(10,6))
+    nav = Column(Numeric(20,4), nullable=False)           # 해당 자산의 NAV
+    weight = Column(Numeric(10,6), nullable=False)        # 포트폴리오 내 비중 (%)
+    market_value = Column(Numeric(20,4), nullable=False)  # 시장가치
+    quantity = Column(Numeric(20,8), nullable=False)      # 보유수량
+    avg_cost = Column(Numeric(20,8), nullable=False)      # 평균단가
     
     # 관계 설정
-    portfolio = relationship("Portfolio", back_populates="asset_attributions")
+    portfolio = relationship("Portfolio", back_populates="asset_nav_daily")
     asset = relationship("Asset")
     
     __table_args__ = (
-        UniqueConstraint('portfolio_id', 'period_type', 'start_date', 'end_date', 'asset_id',
-                        name='uq_attribution_period'),
+        UniqueConstraint('portfolio_id', 'as_of_date', 'asset_id',
+                        name='uq_asset_nav_daily'),
     )
 
-# 기간별 자산군 기여도 테이블 모델
-class AssetClassAttributionPeriodic(Base):
-    """기간별 자산군 단위 기여도 분석 결과"""
-    __tablename__ = 'asset_class_attribution_periodic'
+# 일별 자산군 NAV 테이블 모델
+class AssetClassNavDaily(Base):
+    """일별 자산군별 NAV 및 비중"""
+    __tablename__ = 'asset_class_nav_daily'
     
     id = Column(Integer, primary_key=True)
     portfolio_id = Column(Integer, ForeignKey('portfolios.id', ondelete="CASCADE"), nullable=False)
-    period_type = Column(Enum(*PERIOD_TYPE_ENUM, name='period_type_enum'), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
+    as_of_date = Column(Date, nullable=False)
     asset_class = Column(Enum(*ASSET_CLASS_ENUM, name='asset_class_enum'), nullable=False)
     
-    start_nav = Column(Numeric(20,4), nullable=False)
-    end_nav = Column(Numeric(20,4), nullable=False)
-    avg_weight = Column(Numeric(10,6), nullable=False)
-    total_return = Column(Numeric(10,6), nullable=False)
-    contribution = Column(Numeric(10,6), nullable=False)
-    selection_effect = Column(Numeric(10,6))
-    allocation_effect = Column(Numeric(10,6))
-    risk_contribution = Column(Numeric(10,6))
-    tracking_error_contrib = Column(Numeric(10,6))
+    nav = Column(Numeric(20,4), nullable=False)           # 해당 자산군의 총 NAV
+    weight = Column(Numeric(10,6), nullable=False)        # 포트폴리오 내 비중 (%)
+    market_value = Column(Numeric(20,4), nullable=False)  # 해당 자산군의 총 시장가치
+    asset_count = Column(Integer, nullable=False)         # 해당 자산군 내 자산 개수
     
     # 관계 설정
-    portfolio = relationship("Portfolio", back_populates="class_attributions")
+    portfolio = relationship("Portfolio", back_populates="asset_class_nav_daily")
     
     __table_args__ = (
-        UniqueConstraint('portfolio_id', 'period_type', 'start_date', 'end_date', 'asset_class',
-                        name='uq_class_attribution_period'),
-    )
-
-# Top/Bottom 기여자 테이블 모델
-class AttributionHighlightsPeriodic(Base):
-    """기간별 Top/Bottom 기여자 분석 결과"""
-    __tablename__ = 'attribution_highlights_periodic'
-    
-    id = Column(Integer, primary_key=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id', ondelete="CASCADE"), nullable=False)
-    period_type = Column(Enum(*PERIOD_TYPE_ENUM, name='period_type_enum'), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    rank_type = Column(Enum(*RANK_TYPE_ENUM, name='rank_type_enum'), nullable=False)
-    rank_number = Column(Integer, nullable=False)
-    asset_id = Column(Integer, ForeignKey('assets.id', ondelete="CASCADE"), nullable=False)
-    
-    contribution = Column(Numeric(10,6), nullable=False)
-    weight_avg = Column(Numeric(10,6), nullable=False)
-    return_total = Column(Numeric(10,6), nullable=False)
-    
-    # 관계 설정
-    portfolio = relationship("Portfolio", back_populates="attribution_highlights")
-    asset = relationship("Asset")
-    
-    __table_args__ = (
-        UniqueConstraint('portfolio_id', 'period_type', 'start_date', 'end_date', 
-                        'rank_type', 'rank_number',
-                        name='uq_highlights_period'),
+        UniqueConstraint('portfolio_id', 'as_of_date', 'asset_class',
+                        name='uq_asset_class_nav_daily'),
     )
 
 """데이터베이스 연결 설정

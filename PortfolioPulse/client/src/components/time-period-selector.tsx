@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, ChevronDown } from "lucide-react";
-import type { Portfolio } from "@shared/types";
 
 export type TimePeriod = "all" | "1w" | "2w" | "1m" | "custom";
 
@@ -12,47 +10,25 @@ interface TimePeriodSelectorProps {
   onChange: (period: TimePeriod, customWeek?: string, customMonth?: string) => void;
   variant?: "overview" | "default";
   className?: string;
-  onPortfolioChange?: (portfolio: Portfolio) => void;
-  currentPortfolio?: Portfolio;
 }
 
 export function TimePeriodSelector({ 
   value, 
   onChange, 
   variant = "default", 
-  className = "",
-  onPortfolioChange,
-  currentPortfolio
+  className = ""
 }: TimePeriodSelectorProps) {
   const [showCustom, setShowCustom] = useState(false);
   const [customWeek, setCustomWeek] = useState("");
   const [customMonth, setCustomMonth] = useState("");
-  const [selectedType, setSelectedType] = useState<"domestic" | "foreign">("domestic");
-
-  const { data: domesticPortfolios } = useQuery<Portfolio[]>({
-    queryKey: ["/api/portfolios", "domestic"],
-    queryFn: () => fetch("/api/portfolios?type=domestic").then(res => res.json()),
-  });
-
-  const { data: foreignPortfolios } = useQuery<Portfolio[]>({
-    queryKey: ["/api/portfolios", "foreign"], 
-    queryFn: () => fetch("/api/portfolios?type=foreign").then(res => res.json()),
-  });
-
-  const handleTypeChange = (type: "domestic" | "foreign") => {
-    setSelectedType(type);
-    const portfolios = type === "domestic" ? domesticPortfolios : foreignPortfolios;
-    if (portfolios && portfolios.length > 0 && onPortfolioChange) {
-      onPortfolioChange(portfolios[0]);
-    }
-  };
 
   const handlePeriodChange = (newPeriod: TimePeriod) => {
     if (newPeriod === "custom") {
       setShowCustom(true);
     } else {
       setShowCustom(false);
-      onChange(newPeriod);
+      // 일반 기간 선택 시에도 전체 파라미터 전달 (커스텀 파라미터는 undefined)
+      onChange(newPeriod, undefined, undefined);
     }
   };
 
@@ -128,38 +104,6 @@ export function TimePeriodSelector({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* Portfolio Type Selector - only show if onPortfolioChange is provided */}
-      {onPortfolioChange && (
-        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 max-w-fit">
-          <Button
-            variant={selectedType === "domestic" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => handleTypeChange("domestic")}
-            className={`px-4 py-2 text-xs font-medium transition-colors ${
-              selectedType === "domestic"
-                ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-            }`}
-            data-testid="button-domestic-portfolio"
-          >
-            Domestic
-          </Button>
-          <Button
-            variant={selectedType === "foreign" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => handleTypeChange("foreign")}
-            className={`px-4 py-2 text-xs font-medium transition-colors ${
-              selectedType === "foreign"
-                ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-            }`}
-            data-testid="button-foreign-portfolio"
-          >
-            Foreign
-          </Button>
-        </div>
-      )}
-      
       {/* Period Selection */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">

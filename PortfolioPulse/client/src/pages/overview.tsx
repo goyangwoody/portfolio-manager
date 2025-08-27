@@ -1,43 +1,115 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { KpiCard } from "@/components/kpi-card";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
+import { PortfolioSelector } from "@/components/portfolio-selector";
 import type { Portfolio, PerformanceData } from "@shared/types";
 import { formatCurrency, formatLargeNumber } from "@/lib/utils";
+import { getQueryOptions } from "@/lib/portfolio-utils";
 
 export default function Overview() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
-  const queryClient = useQueryClient();
+  const [customWeek, setCustomWeek] = useState<string>("");
+  const [customMonth, setCustomMonth] = useState<string>("");
 
   const { data: portfolios, isLoading: portfoliosLoading, error: portfoliosError } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios"],
+    queryFn: async () => {
+      console.log("📋 Overview: 포트폴리오 목록 조회 시작 (SIMPLE API)");
+      const response = await fetch("/api/portfolios");
+      
+      if (!response.ok) {
+        console.error("❌ API 응답 실패:", response.status, response.statusText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("✅ 백엔드 원본 응답:", data);
+      
+      // 백엔드 응답에서 portfolios 배열 추출
+      const portfoliosList = data.portfolios || data;
+      
+      // 백엔드 응답을 프론트엔드 형식으로 변환
+      const transformedData = portfoliosList.map((portfolio: any) => ({
+        ...portfolio,
+        // 기존 필드명과의 호환성을 위한 매핑
+        totalReturn: portfolio.total_return || 0,
+        sharpeRatio: portfolio.sharpe_ratio || 0,
+        cashRatio: portfolio.cash_ratio || 0,  // cash_ratio -> cashRatio 변환 추가
+      }));
+      
+      console.log("� 변환된 포트폴리오 데이터:", transformedData);
+      console.log("📊 첫 번째 포트폴리오:", transformedData[0]);
+      return transformedData;
+    },
+    ...getQueryOptions(),
   });
 
   // Use current portfolio or first available portfolio
   const portfolio = currentPortfolio || portfolios?.[0];
 
-    const { data: performanceData, isLoading: performanceLoading, error: performanceError } = useQuery({
-    queryKey: ["/api/portfolios", currentPortfolio?.id, "performance"],
+  // 포트폴리오 목록이 로드되면 자동으로 첫 번째 포트폴리오 선택
+  useEffect(() => {
+    if (portfolios && portfolios.length > 0 && !currentPortfolio) {
+      console.log("🎯 Overview: 기본 포트폴리오 자동 선택:", portfolios[0]);
+      setCurrentPortfolio(portfolios[0]);
+    }
+  }, [portfolios, currentPortfolio]);
+
+  const { data: performanceData, isLoading: performanceLoading, error: performanceError } = useQuery({
+    queryKey: ["/api/portfolios", portfolio?.id, "performance", timePeriod, customWeek, customMonth],
     queryFn: () => {
-      console.log(`📊 Fetching performance data for portfolio ${currentPortfolio?.id}`);
-      return fetch(`/api/portfolios/${currentPortfolio?.id}/performance`).then(res => res.json());
+      console.log(`📊 성능 데이터 조회: 포트폴리오 ${portfolio?.id}, 기간: ${timePeriod}, 커스텀: ${customWeek || customMonth} (SIMPLE API)`);
+      const params = new URLSearchParams();
+      params.append('period', timePeriod);
+      
+      // 커스텀 기간 처리
+      if (timePeriod === 'custom') {
+        if (customWeek) {
+          // 주 단위 커스텀 기간 (예: "2024-W35-1" 형식)
+          params.append('custom_week', customWeek);
+        } else if (customMonth) {
+          // 월 단위 커스텀 기간 (예: "2024-08" 형식)
+          params.append('custom_month', customMonth);
+        }
+      }
+      
+      const url = `/api/portfolios/${portfolio?.id}/performance?${params.toString()}`;
+      console.log(`🔗 API 호출 URL: ${url}`);
+      
+      return fetch(url).then(res => res.json());
     },
-    enabled: !!currentPortfolio?.id,
-    staleTime: 0, // 항상 새로운 데이터 가져오기
-    gcTime: 0, // 캐시 즉시 삭제
+    enabled: !!portfolio?.id, // 포트폴리오가 선택된 경우에만 실행
   });
 
-  const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
+  const handleTimePeriodChange = (period: TimePeriod, customWeekParam?: string, customMonthParam?: string) => {
+    console.log(`🔄 기간 변경: ${timePeriod} → ${period}`, { customWeekParam, customMonthParam });
+    
     setTimePeriod(period);
-    // Here you would normally filter data based on the period
-    console.log("Period changed:", period, customWeek, customMonth);
+    
+    // 커스텀 기간 상태 업데이트
+    if (period === 'custom') {
+      if (customWeekParam) {
+        setCustomWeek(customWeekParam);
+        setCustomMonth(""); // 다른 커스텀 옵션 클리어
+      } else if (customMonthParam) {
+        setCustomMonth(customMonthParam);
+        setCustomWeek(""); // 다른 커스텀 옵션 클리어
+      }
+    } else {
+      // 일반 기간 선택 시 커스텀 옵션 클리어
+      setCustomWeek("");
+      setCustomMonth("");
+    }
+    
+    console.log(`✅ 기간 변경 완료 - API 재호출됨`);
   };
 
   const handlePortfolioChange = (newPortfolio: Portfolio) => {
-    console.log(`🔄 Portfolio changing from ${currentPortfolio?.id} to ${newPortfolio.id}`);
+    console.log(`🔄 Overview: 포트폴리오 변경 ${currentPortfolio?.id} → ${newPortfolio.id}`);
     setCurrentPortfolio(newPortfolio);
   };
 
@@ -91,7 +163,7 @@ export default function Overview() {
     );
   }
 
-  const chartData = performanceData?.map((item: any) => ({
+  const chartData = performanceData?.data?.map((item: any) => ({
     date: new Date(item.date).toLocaleDateString('en-US', { month: 'short' }),
     portfolio: item.portfolioValue,
     benchmark: item.benchmarkValue,
@@ -102,14 +174,19 @@ export default function Overview() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Combined Portfolio and Time Period Selector */}
+      {/* Portfolio Selector */}
+      <PortfolioSelector
+        currentPortfolio={portfolio}
+        onPortfolioChange={handlePortfolioChange}
+        className="mb-4"
+      />
+      
+      {/* Time Period Selector */}
       <TimePeriodSelector
         value={timePeriod}
         onChange={handleTimePeriodChange}
         variant="overview"
         className="mb-6"
-        onPortfolioChange={handlePortfolioChange}
-        currentPortfolio={portfolio}
       />
 
       {/* KPI Cards Section */}
@@ -136,11 +213,11 @@ export default function Overview() {
           testId="kpi-nav"
         />
         <KpiCard
-          title="AUM"
-          value={portfolio.aum ? formatLargeNumber(portfolio.aum, portfolio.currency) : "N/A"}
-          subtitle="Total"
+          title="Cash Ratio"
+          value={portfolio.cashRatio ? `${portfolio.cashRatio.toFixed(1)}%` : "N/A"}
+          subtitle="현금 비중"
           valueColor="default"
-          testId="kpi-aum"
+          testId="kpi-cash-ratio"
         />
       </div>
 
@@ -224,35 +301,6 @@ export default function Overview() {
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
               <span className="text-gray-600 dark:text-gray-400">S&P 500</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Stats */}
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">
-            Key Metrics
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Volatility (12M)</span>
-              <span className="font-medium" data-testid="text-volatility">
-                {portfolio.volatility ? `${portfolio.volatility}%` : "N/A"}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Max Drawdown</span>
-              <span className="font-medium text-danger" data-testid="text-max-drawdown">
-                {portfolio.maxDrawdown ? `${portfolio.maxDrawdown}%` : "N/A"}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Beta</span>
-              <span className="font-medium" data-testid="text-beta">
-                {portfolio.beta || "N/A"}
-              </span>
             </div>
           </div>
         </CardContent>

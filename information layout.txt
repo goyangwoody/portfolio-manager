@@ -1,0 +1,60 @@
+페이지 별 표시할 정보
+
+Overview
+
+-domestic/foreign select
+
+KPI Card
+-total return(단순 nav 비율)
+-sharpe ratio
+-nav
+-cash ratio
+
+Chart
+-period select
+-performance(nav) vs benchmark(kospi)
+
+
+Performance
+
+-domestic/foreign select
+-period select(all time/specific period)
+
+all time
+-recent 1d/1w/1m return (단순 nav 비율)
+-recent week daily returns (단순 nav 비율)
+-vs all time benchmarks return(%)(kospi/kospi200/s&p500)
+
+specific period
+-cumulative return until the end of the period (단순 nav 비율)
+-daily returns during the period (단순 nav 비율)
+-vs benchmarks return(%) during the period (단순 nav 비율)
+
+--------------------포트폴리오 내 자산 별/자산군 별 접근(TWR 수익률)-------------------
+
+Attribution
+
+-domestic/foreign select
+-period select(all time/specific period)
+
+all time
+-attribution by asset class (일단위 TWR 수익률)
+->current allcoation, contribution
+ chart: allocation weight trend(%), return trend(TWR)
+-Top n Contributors/Detractors (allocation/nav return/twr contribution) 
+-> individual asset card with price performance
+
+specific period
+-attribution by asset class during the period (TWR)
+-Top/Bottom during the period (TWR) 
+
+Assets
+
+-domestic/foreign select
+-period select(all time/specific period)
+
+Risk
+
+-domestic/foreign select
+-period select(all time/specific period)
+

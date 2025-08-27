@@ -13,7 +13,6 @@ import RiskAllocation from "@/pages/risk-allocation";
 import Assets from "@/pages/assets";
 import NotFound from "@/pages/not-found";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import type { Portfolio } from "@shared/types";
 
 function Header() {
@@ -43,34 +42,26 @@ function Header() {
   );
 }
 
-function Router() {
-  return (
-    <>
-      <Header />
-      <main>
-        <Switch>
-          <Route path="/" component={Overview} />
-          <Route path="/performance" component={Performance} />
-          <Route path="/attribution" component={Attribution} />
-          <Route path="/assets" component={Assets} />
-          <Route path="/risk" component={RiskAllocation} />
-          <Route component={NotFound} />
-        </Switch>
-      </main>
-      <BottomNavigation />
-    </>
-  );
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <div className="min-h-screen bg-gray-50 dark:bg-dark-bg text-gray-900 dark:text-dark-text">
-            <Toaster />
-            <Router />
+          <div className="min-h-screen bg-background">
+            <Header />
+            <main>
+              <Switch>
+                <Route path="/" component={Overview} />
+                <Route path="/performance" component={Performance} />
+                <Route path="/attribution" component={Attribution} />
+                <Route path="/assets" component={Assets} />
+                <Route path="/risk" component={RiskAllocation} />
+                <Route component={NotFound} />
+              </Switch>
+            </main>
+            <BottomNavigation />
           </div>
+          <Toaster />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -3,11 +3,30 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, AttributionData, RiskMetrics, SectorAllocation } from "@shared/types";
+import { PortfolioSelector } from "@/components/portfolio-selector";
+import type { Portfolio, AttributionData } from "@shared/types";
+
+// 임시 타입 정의 (나중에 shared/types.ts로 이동)
+interface RiskMetrics {
+  volatility: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  beta: number;
+  var95: number;
+  correlation: number;
+}
+
+interface SectorAllocation {
+  sector: string;
+  allocation: number;
+  color: string;
+}
 
 export default function RiskAllocation() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const [customWeek, setCustomWeek] = useState<string>("");
+  const [customMonth, setCustomMonth] = useState<string>("");
   const queryClient = useQueryClient();
 
   const { data: portfolios } = useQuery<Portfolio[]>({
@@ -16,9 +35,27 @@ export default function RiskAllocation() {
 
   const portfolio = currentPortfolio || portfolios?.[0];
 
-  const handleTimePeriodChange = (period: TimePeriod, customWeek?: string, customMonth?: string) => {
+  const handleTimePeriodChange = (period: TimePeriod, customWeekParam?: string, customMonthParam?: string) => {
+    console.log(`🔄 Risk-Allocation 기간 변경: ${timePeriod} → ${period}`, { customWeekParam, customMonthParam });
+    
     setTimePeriod(period);
-    console.log("Period changed:", period, customWeek, customMonth);
+    
+    // 커스텀 기간 상태 업데이트
+    if (period === 'custom') {
+      if (customWeekParam) {
+        setCustomWeek(customWeekParam);
+        setCustomMonth(""); // 다른 커스텀 옵션 클리어
+      } else if (customMonthParam) {
+        setCustomMonth(customMonthParam);
+        setCustomWeek(""); // 다른 커스텀 옵션 클리어
+      }
+    } else {
+      // 일반 기간 선택 시 커스텀 옵션 클리어
+      setCustomWeek("");
+      setCustomMonth("");
+    }
+    
+    console.log(`✅ Risk-Allocation 기간 변경 완료`);
   };
 
   const handlePortfolioChange = (newPortfolio: Portfolio) => {
@@ -70,13 +107,18 @@ export default function RiskAllocation() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Combined Portfolio and Time Period Selector */}
+      {/* Portfolio Selector */}
+      <PortfolioSelector
+        currentPortfolio={portfolio}
+        onPortfolioChange={handlePortfolioChange}
+        className="mb-4"
+      />
+      
+      {/* Time Period Selector */}
       <TimePeriodSelector
         value={timePeriod}
         onChange={handleTimePeriodChange}
         className="mb-6"
-        onPortfolioChange={handlePortfolioChange}
-        currentPortfolio={portfolio}
       />
 
       {/* Current Allocation Chart */}
