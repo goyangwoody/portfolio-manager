@@ -21,26 +21,23 @@ services:
       retries: 20
       start_period: 10s
 
+  
   nginx:
     image: nginx:1.27
     container_name: portfolio_nginx
     restart: always
     depends_on:
-      - api   # (compose v2+에서는 healthcheck 조건도 가능)
+      - api
     ports:
-      - "80:80"     # HTTP
-      - "443:443"   # HTTPS (인증서 발급 후 활성)
+      - "80:80"
+      - "443:443"
     volumes:
-      # 서버블록(가상호스트)들
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      # 정적 빌드(리액트 등) 배포 폴더(필요 없으면 제거)
-      - ./web_build:/usr/share/nginx/html:ro
-      # 인증서/챌린지 공유 볼륨 (certbot 컨테이너와 동일 경로 사용)
-      - ./certbot/www:/var/www/certbot:ro
-      - ./certbot/letsencrypt:/etc/letsencrypt:ro
+      - /srv/app/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /srv/app/web_build:/usr/share/nginx/html:ro
+      - /srv/app/certbot/www:/var/www/certbot:ro
+      - /srv/app/certbot/letsencrypt:/etc/letsencrypt:ro
     networks:
       - appnet
-
   # 인증서 발급/갱신용 사이드카(명령 내릴 때만 사용)
   certbot:
     image: certbot/certbot:latest
