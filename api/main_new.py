@@ -46,7 +46,10 @@ from schemas_new import (
 app = FastAPI(
     title="PortfolioPulse API",
     version="3.0.0",
-    description="Mobile-first portfolio management API for external reporting"
+    description="Mobile-first portfolio management API for external reporting",
+    docs_url="/api/docs",              # ← Swagger UI 경로를 /api로
+    openapi_url="/api/openapi.json",   # ← 스펙 경로도 /api로
+    redoc_url=None
 )
 
 # CORS middleware
