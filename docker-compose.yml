@@ -14,7 +14,7 @@ services:
     networks:
       - appnet
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/docs >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10

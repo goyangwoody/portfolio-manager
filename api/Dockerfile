@@ -21,6 +21,9 @@ COPY src/ /app/src/
 # /app/src 임포트 위해 PYTHONPATH=/app  (← 이미 잘 되어있음)
 ENV PYTHONPATH=/app
 
+# 포트 노출
+EXPOSE 8000
+
 # ★ 핵심: /app을 작업 디렉터리로 유지, 모듈 경로는 main_new:app
 # (main_new.py가 /app에 존재하는 것이 확인됨)
 CMD ["gunicorn","main_new:app","-k","uvicorn.workers.UvicornWorker","-w","2","-b","0.0.0.0:8000","--timeout","120"]

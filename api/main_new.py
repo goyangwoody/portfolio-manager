@@ -209,7 +209,7 @@ async def health_check():
     """헬스 체크"""
     return {"status": "healthy", "message": "PortfolioPulse API v3.0 is running"}
 
-@app.get("/api/portfolios", response_model=PortfoliosResponse)
+@app.get("/portfolios", response_model=PortfoliosResponse)
 async def get_portfolios(
     include_kpi: bool = Query(True, description="KPI 데이터 포함 여부"),
     include_chart: bool = Query(False, description="차트 데이터 포함 여부 (Overview 페이지용)"),
@@ -341,7 +341,7 @@ async def get_portfolios(
         print(f"Error in get_portfolios: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/portfolios/{portfolio_id}/performance")
+@app.get("/portfolios/{portfolio_id}/performance")
 async def get_portfolio_performance(
     portfolio_id: int,
     period: str = Query("all", description="분석 기간"),
@@ -797,7 +797,7 @@ async def calculate_benchmark_returns_all_time(portfolio_id: int, db: Session) -
     
     # return benchmark_returns
 
-@app.get("/api/portfolios/{portfolio_id}/attribution", response_model=AttributionResponse)
+@app.get("/portfolios/{portfolio_id}/attribution", response_model=AttributionResponse)
 async def get_portfolio_attribution(
     portfolio_id: int,
     period: TimePeriod = Query(TimePeriod.INCEPTION, description="분석 기간"),
@@ -818,7 +818,7 @@ async def get_portfolio_attribution(
         print(f"Error in get_portfolio_attribution: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/portfolios/{portfolio_id}/holdings", response_model=PortfolioHoldingsResponse)
+@app.get("/portfolios/{portfolio_id}/holdings", response_model=PortfolioHoldingsResponse)
 async def get_portfolio_holdings(
     portfolio_id: int,
     as_of_date: Optional[date] = Query(None, description="기준일 (기본값: 최신일)"),
@@ -920,7 +920,7 @@ async def get_portfolio_holdings(
         print(f"Error in get_portfolio_holdings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/portfolios/{portfolio_id}/assets/{asset_id}", response_model=AssetDetailResponse)
+@app.get("/portfolios/{portfolio_id}/assets/{asset_id}", response_model=AssetDetailResponse)
 async def get_asset_detail(
     portfolio_id: int,
     asset_id: int,
@@ -993,7 +993,7 @@ async def get_asset_detail(
         print(f"Error in get_asset_detail: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/portfolios/{portfolio_id}/risk-allocation", response_model=RiskAndAllocationResponse)
+@app.get("/portfolios/{portfolio_id}/risk-allocation", response_model=RiskAndAllocationResponse)
 async def get_risk_and_allocation(
     portfolio_id: int,
     period: TimePeriod = Query(TimePeriod.INCEPTION, description="분석 기간"),
