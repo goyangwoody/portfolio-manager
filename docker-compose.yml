@@ -14,12 +14,10 @@ services:
     networks:
       - appnet
     healthcheck:
-      # /health 엔드포인트가 200을 주도록 FastAPI에 간단히 추가 권장
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 20
-      start_period: 10s
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/docs >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
 
   
   nginx:
