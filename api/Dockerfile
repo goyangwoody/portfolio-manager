@@ -3,7 +3,7 @@ WORKDIR /app
 
 # 루트 기준의 경로 사용
 COPY api/requirements.txt ./requirements.txt
-RUN apt-get update && apt-get install -y gcc default-libmysqlclient-dev curl && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y gcc default-libmysqlclient-dev curl && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir "uvicorn[standard]" gunicorn
 
 COPY api/ .        
 COPY src/ /app/src/
