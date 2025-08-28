@@ -1,15 +1,11 @@
 FROM python:3.11-slim
-
 WORKDIR /app
-# (선택) 빌드에 필요한 OS 패키지
-RUN apt-get update && apt-get install -y gcc default-libmysqlclient-dev curl && rm -rf /var/lib/apt/lists/*
 
-# 루트의 requirements.txt를 먼저 복사/설치
-COPY api/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 루트 기준의 경로 사용
+COPY api/requirements.txt ./requirements.txt
+RUN apt-get update && apt-get install -y gcc default-libmysqlclient-dev curl && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir -r requirements.txt
 
-# 백엔드와 공유모듈 복사
-COPY api/ /app/api/
+COPY api/ .        
 COPY src/ /app/src/
 
 # src를 찾을 수 있도록 파이썬 경로 추가
