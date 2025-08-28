@@ -36,19 +36,21 @@ services:
       # 정적 빌드(리액트 등) 배포 폴더(필요 없으면 제거)
       - ./web_build:/usr/share/nginx/html:ro
       # 인증서/챌린지 공유 볼륨 (certbot 컨테이너와 동일 경로 사용)
-      - ./certbot/www:/var/www/certbot:rw
-      - ./certbot/letsencrypt:/etc/letsencrypt:rw
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/letsencrypt:/etc/letsencrypt:ro
     networks:
       - appnet
 
   # 인증서 발급/갱신용 사이드카(명령 내릴 때만 사용)
   certbot:
-    image: certbot/certbot
+    image: certbot/certbot:latest
     container_name: portfolio_certbot
     # 필요 시에만 실행하므로 평소엔 꺼둬도 됨
     volumes:
-      - ./certbot/www:/var/www/certbot:rw
-      - ./certbot/letsencrypt:/etc/letsencrypt:rw
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/letsencrypt:/etc/letsencrypt
+      - ./certbot/log:/var/log/letsencrypt
+
     command: -c "sleep infinity"
     networks:
       - appnet

@@ -55,6 +55,8 @@ jobs:
             --rsync-path="sudo rsync" \
             -e "ssh -i ~/.ssh/github_deploy" \
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_PATH }}/
+            --exclude "certbot/" \   # ← 인증서 폴더 보호
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_PATH }}/
     # 서버에서 명령 실행 시에도 -i 지정
       - name: Restart compose on EC2
         run: |
