@@ -126,6 +126,86 @@ class StressTestResponse(BaseModel):
     asset_filter: AssetFilter = Field(description="적용된 자산 필터")
 
 # ================================
+# ASSET ALLOCATION SCHEMAS
+# ================================
+
+class AssetAllocationItem(BaseModel):
+    """자산 배분 항목"""
+    asset_id: int
+    ticker: str
+    name: str
+    asset_class: str
+    market_value: float = Field(description="시장가치")
+    weight: float = Field(description="비중 (%)")
+    
+    class Config:
+        from_attributes = True
+
+class AssetClassAllocation(BaseModel):
+    """자산군별 배분"""
+    asset_class: str = Field(description="자산군")
+    total_value: float = Field(description="총 시장가치")
+    total_weight: float = Field(description="총 비중 (%)")
+    asset_count: int = Field(description="자산 수")
+    assets: List[AssetAllocationItem] = Field(description="구성 자산 목록")
+
+class AssetAllocationResponse(BaseModel):
+    """자산 배분 응답"""
+    total_portfolio_value: float = Field(description="포트폴리오 총 가치")
+    as_of_date: Date = Field(description="기준일")
+    allocations: List[AssetClassAllocation] = Field(description="자산군별 배분")
+    asset_filter: AssetFilter = Field(description="적용된 자산 필터")
+
+# ================================
+# ASSET CLASS DETAIL SCHEMAS
+# ================================
+
+class AssetClassDetailItem(BaseModel):
+    """자산군 상세 - 개별 자산 정보"""
+    asset_id: int
+    ticker: str
+    name: str
+    asset_class: str
+    
+    # 포지션 정보
+    quantity: float = Field(description="보유 수량")
+    avg_price: float = Field(description="평균 매입가")
+    current_price: float = Field(description="현재가")
+    market_value: float = Field(description="시장가치")
+    weight: float = Field(description="포트폴리오 내 비중 (%)")
+    
+    # 수익률 정보
+    day_change: Optional[float] = Field(None, description="일간 변동")
+    day_change_percent: Optional[float] = Field(None, description="일간 변동률 (%)")
+    unrealized_pnl: Optional[float] = Field(None, description="미실현 손익")
+    total_return_percent: Optional[float] = Field(None, description="총 수익률 (%)")
+    
+    # 메타데이터
+    region: Optional[str] = Field(None, description="지역")
+    currency: Optional[str] = Field(None, description="통화")
+    
+    class Config:
+        from_attributes = True
+
+class AssetClassDetailsResponse(BaseModel):
+    """자산군 상세 정보 응답"""
+    asset_class: str = Field(description="자산군명")
+    total_value: float = Field(description="총 시장가치")
+    total_weight: float = Field(description="포트폴리오 내 총 비중 (%)")
+    asset_count: int = Field(description="자산 수")
+    
+    # 자산 목록
+    assets: List[AssetClassDetailItem] = Field(description="구성 자산 상세 목록")
+    
+    # 기준 정보
+    as_of_date: Date = Field(description="기준일")
+    portfolio_id: int = Field(description="포트폴리오 ID")
+    
+    # 통계 정보
+    avg_return: Optional[float] = Field(None, description="평균 수익률 (%)")
+    total_unrealized_pnl: Optional[float] = Field(None, description="총 미실현 손익")
+    
+# ================================
 # LEGACY RISK SCHEMAS
 # ================================
 

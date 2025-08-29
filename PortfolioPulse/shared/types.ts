@@ -402,3 +402,134 @@ export interface Benchmark {
   return: number;
   outperformance: number;
 }
+
+// ================================
+// RISK TYPES
+// ================================
+
+// 자산군별 배분 데이터
+export interface AssetClassAllocation {
+  asset_class: string;        // 자산군명
+  allocation: number;         // 배분 비중 (%)
+  market_value: number;       // 시장가치
+  assets: AssetAllocationDetail[]; // 구성 자산 목록
+}
+
+// 자산별 배분 상세 정보
+export interface AssetAllocationDetail {
+  asset_id: number;
+  ticker: string;
+  name: string;
+  quantity: number;
+  market_value: number;
+  weight: number;             // 포트폴리오 내 비중 (%)
+  currency: string;
+  region: string;             // domestic/foreign
+}
+
+// 자산 배분 응답
+export interface AssetAllocationResponse {
+  asset_class_allocations: AssetClassAllocation[];
+  total_value: number;
+  as_of_date: string;
+  asset_filter: string;
+}
+
+// 포트폴리오 리스크 지표
+export interface PortfolioRiskMetrics {
+  volatility: number;         // 변동성 (연환산, %)
+  sharpe_ratio: number;       // 샤프 비율
+  max_drawdown: number;       // 최대 낙폭 (%)
+  var_95: number;            // 95% VaR (%)
+  var_99: number;            // 99% VaR (%)
+  period_days: number;       // 분석 기간 (일)
+  start_date: string;        // 분석 시작일
+  end_date: string;          // 분석 종료일
+}
+
+// 자산별 리스크 기여도
+export interface AssetRiskContribution {
+  asset_id: number;
+  ticker: string;
+  name: string;
+  asset_class: string;
+  current_weight: number;     // 현재 비중 (%)
+  volatility: number;         // 개별 변동성 (%)
+  beta?: number;              // 베타 (vs 포트폴리오)
+  risk_contribution: number;  // 포트폴리오 리스크 기여도 (%)
+  marginal_var: number;       // 한계 VaR
+}
+
+// 리스크 분석 응답
+export interface RiskAnalysisResponse {
+  portfolio_metrics: PortfolioRiskMetrics;
+  asset_risk_contributions: AssetRiskContribution[];
+  top_risk_contributors: AssetRiskContribution[];
+  asset_filter: string;
+  period: string;
+  confidence_level: number;
+  total_risk_contribution_check?: number;
+}
+
+// ================================
+// ASSET ALLOCATION TYPES
+// ================================
+
+// 자산군별 배분 (기존 AssetAllocationDetail과 호환)
+export interface AssetClassAllocation {
+  asset_class: string;
+  total_value: number;
+  total_weight: number;
+  asset_count: number;
+  assets: AssetAllocationDetail[];
+}
+
+// 자산 배분 응답
+export interface AssetAllocationResponse {
+  total_portfolio_value: number;
+  as_of_date: string;
+  allocations: AssetClassAllocation[];
+  asset_filter: string;
+}
+
+// 자산군 상세 - 개별 자산 정보
+export interface AssetClassDetailItem {
+  asset_id: number;
+  ticker: string;
+  name: string;
+  asset_class: string;
+  
+  // 포지션 정보
+  quantity: number;
+  avg_price: number;
+  current_price: number;
+  market_value: number;
+  weight: number;  // 포트폴리오 내 비중 (%)
+  
+  // 수익률 정보
+  day_change?: number;
+  day_change_percent?: number;
+  unrealized_pnl?: number;
+  total_return_percent?: number;
+  
+  // 메타데이터
+  region?: string;
+  currency?: string;
+}
+
+// 자산군별 상세 정보 응답
+export interface AssetClassDetailsResponse {
+  asset_class: string;
+  total_value: number;
+  total_weight: number;
+  asset_count: number;
+  assets: AssetClassDetailItem[];
+  as_of_date: string;
+  portfolio_id: number;
+  
+  // 통계 정보
+  avg_return?: number;
+  total_unrealized_pnl?: number;
+  
+  error?: string;
+}
