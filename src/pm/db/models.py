@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Float, Date, Enum, ForeignKey, UniqueConstraint, Numeric
+    create_engine, Column, Integer, String, Float, Date, DateTime, Enum, ForeignKey, UniqueConstraint, Numeric, Text, Boolean
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from datetime import datetime
 
 # 환경 변수(.env) 로드 시도
 try:
@@ -32,6 +33,27 @@ Base = declarative_base()
 ASSET_CLASS_ENUM = (
     'SP50', 'FXCOM', 'GL_INDEX', 'GL_SECTOR', 'KR_INDEX', 'KR_SECTOR', 'MONEY_ULTRA_SHORT', 'GL_BOND_CORP', 'GL_BOND_AGG', 'KR_BOND_CORP', 'KR_BOND_AGG'
     )
+
+# 시장 데이터용 상수 정의 (ENUM 대신 사용)
+MARKET_TYPES = {
+    'STOCK_INDEX': '주식 지수',
+    'BOND_INDEX': '채권 지수', 
+    'COMMODITY': '원자재',
+    'CURRENCY': '환율',
+    'RATE': '금리'
+}
+
+COUNTRIES = {
+    'US': '미국',
+    'KR': '한국',
+    'GLOBAL': '글로벌'
+}
+
+RATE_TYPES = {
+    'CENTRAL_BANK_RATE': '중앙은행 기준금리',
+    'TREASURY_RATE': '국채금리',
+    'CORPORATE_BOND_RATE': '회사채 금리'
+}
 
 
 # Portfolio 테이블 모델
@@ -160,6 +182,210 @@ class AssetClassReturnDaily(Base):
         UniqueConstraint('portfolio_id', 'date', 'asset_class',
                         name='uq_assetclass_ret_port_date_class'),
     )
+
+
+class MarketInstrument(Base):
+    """시장 상품 마스터 테이블 (정규화) - ENUM 없는 버전"""
+    __tablename__ = 'market_instruments'
+    
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String(20), unique=True, nullable=False)  # ^GSPC, USDKRW=X
+    name = Column(String(100), nullable=False)  # S&P 500, USD/KRW
+    market_type = Column(String(20), nullable=False)  # STOCK_INDEX, CURRENCY, RATE 등
+    country = Column(String(10), nullable=False)  # US, KR, GLOBAL 등
+    currency = Column(String(3), nullable=False)  # USD, KRW
+    description = Column(String(200))
+    is_active = Column(String(10), default='Yes')
+    
+    # 관계 설정
+    price_data = relationship("MarketPriceDaily", back_populates="instrument", cascade="all, delete-orphan")
+    rate_data = relationship("RiskFreeRateDaily", back_populates="instrument", cascade="all, delete-orphan")
+
+
+class MarketPriceDaily(Base):
+    """통합 시장 가격 데이터 테이블"""
+    __tablename__ = 'market_price_daily'
+    
+    id = Column(Integer, primary_key=True)
+    instrument_id = Column(Integer, ForeignKey('market_instruments.id'), nullable=False)
+    date = Column(Date, nullable=False)
+    
+    # 가격 데이터 (모든 타입에 공통)
+    open_price = Column(Numeric(20, 8))
+    high_price = Column(Numeric(20, 8))
+    low_price = Column(Numeric(20, 8))
+    close_price = Column(Numeric(20, 8), nullable=False)
+    volume = Column(Numeric(20, 0))
+    
+    # 계산된 필드
+    daily_return = Column(Numeric(10, 6))  # %
+    
+    # 관계 설정
+    instrument = relationship("MarketInstrument", back_populates="price_data")
+    
+    # 제약조건
+    __table_args__ = (
+        UniqueConstraint('instrument_id', 'date', name='unique_instrument_date'),
+    )
+
+
+class RiskFreeRateDaily(Base):
+    """무위험 이자율 전용 테이블 - ENUM 없는 버전"""
+    __tablename__ = 'risk_free_rate_daily'
+    
+    id = Column(Integer, primary_key=True)
+    instrument_id = Column(Integer, ForeignKey('market_instruments.id'), nullable=False)
+    date = Column(Date, nullable=False)
+    rate = Column(Numeric(8, 4), nullable=False)  # 이자율 (%)
+    rate_type = Column(String(30), nullable=False)  # CENTRAL_BANK_RATE, TREASURY_RATE 등
+    
+    # 관계 설정
+    instrument = relationship("MarketInstrument", back_populates="rate_data")
+    
+    # 제약조건
+    __table_args__ = (
+        UniqueConstraint('instrument_id', 'date', name='unique_rate_instrument_date'),
+    )
+
+
+# =============================================================================
+# 하위 호환성을 위한 뷰 클래스들
+# =============================================================================
+
+class MarketDataHelper:
+    """시장 데이터 조회를 위한 헬퍼 클래스"""
+    
+    @staticmethod
+    def validate_market_type(market_type: str) -> bool:
+        """마켓 타입 유효성 검사"""
+        return market_type in MARKET_TYPES
+    
+    @staticmethod
+    def validate_country(country: str) -> bool:
+        """국가 코드 유효성 검사"""
+        return country in COUNTRIES
+    
+    @staticmethod
+    def validate_rate_type(rate_type: str) -> bool:
+        """금리 타입 유효성 검사"""
+        return rate_type in RATE_TYPES
+    
+    @staticmethod
+    def get_market_type_name(market_type: str) -> str:
+        """마켓 타입의 한국어 이름 반환"""
+        return MARKET_TYPES.get(market_type, market_type)
+    
+    @staticmethod
+    def get_country_name(country: str) -> str:
+        """국가 코드의 한국어 이름 반환"""
+        return COUNTRIES.get(country, country)
+    
+    @staticmethod
+    def get_benchmark_data(session, start_date=None, end_date=None, symbols=None):
+        """벤치마크 지수 데이터 조회 (기존 BenchmarkIndex 테이블 대체)"""
+        query = session.query(
+            MarketPriceDaily.id,
+            MarketInstrument.symbol,
+            MarketInstrument.name,
+            MarketInstrument.country,
+            MarketPriceDaily.date,
+            MarketPriceDaily.close_price,
+            MarketInstrument.currency,
+            MarketPriceDaily.daily_return
+        ).join(MarketInstrument).filter(
+            MarketInstrument.market_type == 'STOCK_INDEX',
+            MarketInstrument.is_active == 'Yes'
+        )
+        
+        if start_date:
+            query = query.filter(MarketPriceDaily.date >= start_date)
+        if end_date:
+            query = query.filter(MarketPriceDaily.date <= end_date)
+        if symbols:
+            query = query.filter(MarketInstrument.symbol.in_(symbols))
+            
+        return query.order_by(MarketInstrument.symbol, MarketPriceDaily.date).all()
+    
+    @staticmethod
+    def get_exchange_rate_data(session, start_date=None, end_date=None, pairs=None):
+        """환율 데이터 조회 (기존 ExchangeRate 테이블 대체)"""
+        query = session.query(
+            MarketPriceDaily.id,
+            MarketInstrument.symbol.label('currency_pair'),
+            MarketPriceDaily.date,
+            MarketPriceDaily.close_price.label('close_rate'),
+            MarketPriceDaily.daily_return
+        ).join(MarketInstrument).filter(
+            MarketInstrument.market_type == 'CURRENCY',
+            MarketInstrument.is_active == 'Yes'
+        )
+        
+        if start_date:
+            query = query.filter(MarketPriceDaily.date >= start_date)
+        if end_date:
+            query = query.filter(MarketPriceDaily.date <= end_date)
+        if pairs:
+            query = query.filter(MarketInstrument.symbol.in_(pairs))
+            
+        return query.order_by(MarketInstrument.symbol, MarketPriceDaily.date).all()
+    
+    @staticmethod
+    def get_risk_free_rate_data(session, start_date=None, end_date=None, countries=None):
+        """무위험 이자율 데이터 조회 (기존 RiskFreeRate 테이블 대체)"""
+        query = session.query(
+            RiskFreeRateDaily.id,
+            MarketInstrument.country,
+            RiskFreeRateDaily.rate_type,
+            MarketInstrument.name,
+            MarketInstrument.symbol,
+            RiskFreeRateDaily.date,
+            RiskFreeRateDaily.rate,
+            MarketInstrument.currency
+        ).join(MarketInstrument).filter(
+            MarketInstrument.market_type == 'RATE',
+            MarketInstrument.is_active == 'Yes'
+        )
+        
+        if start_date:
+            query = query.filter(RiskFreeRateDaily.date >= start_date)
+        if end_date:
+            query = query.filter(RiskFreeRateDaily.date <= end_date)
+        if countries:
+            query = query.filter(MarketInstrument.country.in_(countries))
+            
+        return query.order_by(MarketInstrument.country, RiskFreeRateDaily.date).all()
+
+    @staticmethod
+    def initialize_instruments(session):
+        """초기 마켓 인스트루먼트 데이터 생성"""
+        instruments = [
+            # 미국 주식 지수
+            {'symbol': '^GSPC', 'name': 'S&P 500', 'market_type': 'STOCK_INDEX', 'country': 'US', 'currency': 'USD'},
+            {'symbol': '^IXIC', 'name': 'NASDAQ Composite', 'market_type': 'STOCK_INDEX', 'country': 'US', 'currency': 'USD'},
+            
+            # 한국 주식 지수
+            {'symbol': '^KS11', 'name': 'KOSPI', 'market_type': 'STOCK_INDEX', 'country': 'KR', 'currency': 'KRW'},
+            {'symbol': '^KQ11', 'name': 'KOSDAQ', 'market_type': 'STOCK_INDEX', 'country': 'KR', 'currency': 'KRW'},
+            
+            # 환율
+            {'symbol': 'USDKRW=X', 'name': 'USD/KRW', 'market_type': 'CURRENCY', 'country': 'GLOBAL', 'currency': 'KRW'},
+            
+            # 무위험 이자율
+            {'symbol': '^IRX', 'name': '3-Month Treasury Bill', 'market_type': 'RATE', 'country': 'US', 'currency': 'USD'},
+            {'symbol': 'KOR_BASE_RATE', 'name': '한국은행 기준금리', 'market_type': 'RATE', 'country': 'KR', 'currency': 'KRW'},
+        ]
+        
+        for instrument_data in instruments:
+            existing = session.query(MarketInstrument).filter(
+                MarketInstrument.symbol == instrument_data['symbol']
+            ).first()
+            
+            if not existing:
+                instrument = MarketInstrument(**instrument_data)
+                session.add(instrument)
+        
+        session.commit()
+        return len(instruments)
 
 
 """데이터베이스 연결 설정
