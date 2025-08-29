@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LineChart, Line, Tooltip, Legend } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
 import { PortfolioSelector } from "@/components/portfolio-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -141,6 +141,20 @@ function PerformanceContent({
     gcTime: 0,
   });
 
+  // 벤치마크 비교 차트 데이터
+  const { data: benchmarkChartData, isLoading: benchmarkLoading } = useQuery({
+    queryKey: ["/api/portfolios", portfolio?.id, "performance", "benchmark-comparison", chartPeriod],
+    queryFn: async () => {
+      const period = chartPeriod === 'all' ? 'all' : chartPeriod === '1m' ? '1m' : '1w';
+      const response = await fetch(`/api/portfolios/${portfolio?.id}/performance/benchmark-comparison?period=${period}`);
+      if (!response.ok) throw new Error('Failed to fetch benchmark data');
+      return response.json();
+    },
+    enabled: !!portfolio?.id,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
   // 벤치마크 데이터는 performance 데이터에 포함됨
   const benchmarks = performanceData?.benchmark_returns || [];
 
@@ -230,6 +244,27 @@ function PerformanceContent({
     }
     
     return [];
+  })();
+
+  // Generate benchmark comparison chart data
+  const benchmarkComparisonData = (() => {
+    if (!benchmarkChartData || !benchmarkChartData.portfolio_data || !benchmarkChartData.benchmark_data) return [];
+    
+    const portfolioData = benchmarkChartData.portfolio_data;
+    const benchmarkData = benchmarkChartData.benchmark_data;
+    
+    // 포트폴리오와 벤치마크 데이터를 날짜별로 결합
+    const combinedData = portfolioData.map((portfolioPoint: any, index: number) => {
+      const benchmarkPoint = benchmarkData[index];
+      return {
+        date: new Date(portfolioPoint.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        portfolio: portfolioPoint.value,
+        benchmark: benchmarkPoint ? benchmarkPoint.value : null,
+        benchmarkName: benchmarkPoint ? benchmarkPoint.name : 'Benchmark'
+      };
+    });
+    
+    return combinedData;
   })();
 
   return (
@@ -449,7 +484,112 @@ function PerformanceContent({
         </CardContent>
       </Card>
 
-      {/* Benchmark Comparison */}
+      {/* Benchmark Comparison Chart */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
+              Portfolio vs Benchmark
+            </h3>
+            {/* All Time일 때만 기간 선택 UI */}
+            {isAllTimeData(performanceData) && (
+              <div className="flex gap-1">
+                <button
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${chartPeriod === 'all' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  onClick={() => setChartPeriod('all')}
+                >All Time</button>
+                <button
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${chartPeriod === '1m' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  onClick={() => setChartPeriod('1m')}
+                >1 Month</button>
+                <button
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${chartPeriod === '1w' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  onClick={() => setChartPeriod('1w')}
+                >1 Week</button>
+              </div>
+            )}
+          </div>
+          
+          {benchmarkLoading ? (
+            <div className="h-64 w-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : benchmarkComparisonData.length > 0 ? (
+            <div className="h-64 w-full" data-testid="chart-benchmark-comparison">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={benchmarkComparisonData}>
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'currentColor', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'currentColor', fontSize: 12 }}
+                    domain={['dataMin - 5', 'dataMax + 5']}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                    formatter={(value: any, name: string) => [
+                      `${Number(value).toFixed(1)}`,
+                      name === 'portfolio' ? portfolio?.name || 'Portfolio' : benchmarkComparisonData[0]?.benchmarkName || 'Benchmark'
+                    ]}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="portfolio" 
+                    stroke="#3B82F6" 
+                    strokeWidth={2}
+                    dot={false}
+                    name={portfolio?.name || 'Portfolio'}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="benchmark" 
+                    stroke="#EF4444" 
+                    strokeWidth={2}
+                    dot={false}
+                    strokeDasharray="5 5"
+                    name={benchmarkComparisonData[0]?.benchmarkName || 'Benchmark'}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 w-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+              <div className="text-center">
+                <p>벤치마크 비교 데이터 준비 중</p>
+                <p className="text-xs mt-1">포트폴리오 통화에 따른 벤치마크 자동 선택</p>
+              </div>
+            </div>
+          )}
+          
+          {/* 벤치마크 정보 */}
+          {benchmarkChartData && (
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between text-sm">
+                <div className="text-gray-600 dark:text-gray-400">
+                  Benchmark: {benchmarkChartData.benchmark_name} ({benchmarkChartData.benchmark_symbol})
+                </div>
+                <div className="text-gray-500 dark:text-gray-500">
+                  Based on portfolio currency: {portfolio?.currency}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Benchmark Performance Summary */}
       <Card>
         <CardContent className="p-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">
@@ -483,8 +623,8 @@ function PerformanceContent({
                     <div className="font-medium text-gray-600 dark:text-gray-400">
                       {benchmark.return_pct >= 0 ? '+' : ''}{benchmark.return_pct.toFixed(1)}%
                     </div>
-                    <div className={`text-sm ${benchmark.outperformance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {benchmark.outperformance >= 0 ? '+' : ''}{benchmark.outperformance.toFixed(1)}%
+                    <div className={`text-sm ${benchmark.excess_return >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {benchmark.excess_return >= 0 ? '+' : ''}{benchmark.excess_return.toFixed(1)}%
                     </div>
                   </div>
                 </div>

@@ -37,10 +37,12 @@ class DailyReturnPoint(BaseModel):
 class BenchmarkReturn(BaseModel):
     """벤치마크 수익률 데이터"""
     name: str = Field(description="벤치마크 이름")
-    return_pct: float = Field(description="수익률 (%)")
-    outperformance: float = Field(description="아웃퍼포먼스 (%)")
+    symbol: str = Field(description="벤치마크 심볼")
+    return_pct: float = Field(description="벤치마크 수익률 (%)")
+    excess_return: float = Field(description="포트폴리오 대비 초과수익률 (%)")
     
-    # Backend compatibility
+    # Frontend compatibility
+    outperformance: Optional[float] = Field(None, description="아웃퍼포먼스 (%) - Frontend")
     difference: Optional[float] = Field(None, description="차이 (%) - Backend")
 
 class PerformanceAllTimeResponse(BaseModel):

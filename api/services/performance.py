@@ -1,10 +1,11 @@
 """
 Portfolio performance analysis services
 """
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
+from fastapi import HTTPException
 
 from database import get_db
 from utils import safe_float, parse_custom_period
@@ -12,7 +13,106 @@ from schemas import (
     PerformanceAllTimeResponse, PerformanceCustomPeriodResponse,
     RecentReturnData, DailyReturnPoint, BenchmarkReturn, TimePeriod
 )
-from src.pm.db.models import PortfolioNavDaily, PortfolioPositionDaily
+from src.pm.db.models import (
+    PortfolioNavDaily, PortfolioPositionDaily, Portfolio,
+    MarketInstrument, MarketPriceDaily, MarketDataHelper
+)
+
+def get_benchmark_symbol_by_currency(currency: str) -> str:
+    """포트폴리오 통화에 따른 적절한 벤치마크 심볼 반환"""
+    benchmark_mapping = {
+        'KRW': '^KS11',     # KOSPI
+        'USD': '^GSPC',     # S&P 500
+        'EUR': '^GDAXI',    # DAX (독일)
+        'JPY': '^N225',     # Nikkei 225
+        'GBP': '^FTSE',     # FTSE 100
+        'CNY': '^HSI',      # Hang Seng
+    }
+    
+    # 기본값은 KOSPI (한국 시장)
+    return benchmark_mapping.get(currency, '^KS11')
+
+def normalize_to_index(values: List[float], base_value: float = 100.0) -> List[float]:
+    """값들을 지수화 (첫 번째 값을 기준으로 100으로 정규화)"""
+    if not values or values[0] == 0:
+        return [base_value] * len(values)
+    
+    first_value = values[0]
+    return [(value / first_value) * base_value for value in values]
+
+def calculate_indexed_performance(
+    portfolio_navs: List[float], 
+    portfolio_dates: List[date],
+    benchmark_prices: List[float], 
+    benchmark_dates: List[date]
+) -> Tuple[List[DailyReturnPoint], List[DailyReturnPoint]]:
+    """포트폴리오와 벤치마크를 지수화하여 성과 비교 데이터 생성"""
+    
+    # 공통 날짜 범위 찾기
+    portfolio_date_set = set(portfolio_dates)
+    benchmark_date_set = set(benchmark_dates)
+    common_dates = sorted(portfolio_date_set.intersection(benchmark_date_set))
+    
+    if not common_dates:
+        return [], []
+    
+    # 공통 날짜에 해당하는 데이터 추출
+    portfolio_aligned = []
+    benchmark_aligned = []
+    aligned_dates = []
+    
+    for target_date in common_dates:
+        # 포트폴리오 NAV 찾기
+        try:
+            portfolio_idx = portfolio_dates.index(target_date)
+            portfolio_nav = portfolio_navs[portfolio_idx]
+        except ValueError:
+            continue
+            
+        # 벤치마크 가격 찾기
+        try:
+            benchmark_idx = benchmark_dates.index(target_date)
+            benchmark_price = benchmark_prices[benchmark_idx]
+        except ValueError:
+            continue
+            
+        portfolio_aligned.append(portfolio_nav)
+        benchmark_aligned.append(benchmark_price)
+        aligned_dates.append(target_date)
+    
+    if not portfolio_aligned or not benchmark_aligned:
+        return [], []
+    
+    # 지수화 (100 기준)
+    portfolio_indexed = normalize_to_index(portfolio_aligned, 100.0)
+    benchmark_indexed = normalize_to_index(benchmark_aligned, 100.0)
+    
+    # DailyReturnPoint 형태로 변환
+    portfolio_points = []
+    benchmark_points = []
+    
+    for i, (portfolio_idx, benchmark_idx, date_val) in enumerate(zip(portfolio_indexed, benchmark_indexed, aligned_dates)):
+        # 일일 수익률 계산 (전일 대비)
+        if i > 0:
+            portfolio_daily_return = ((portfolio_idx - portfolio_indexed[i-1]) / portfolio_indexed[i-1]) * 100
+            benchmark_daily_return = ((benchmark_idx - benchmark_indexed[i-1]) / benchmark_indexed[i-1]) * 100
+        else:
+            portfolio_daily_return = 0.0
+            benchmark_daily_return = 0.0
+        
+        portfolio_points.append(DailyReturnPoint(
+            date=date_val,
+            daily_return=portfolio_daily_return,
+            return_pct=((portfolio_idx - 100.0) / 100.0) * 100  # 시작점 대비 누적 수익률
+        ))
+        
+        benchmark_points.append(DailyReturnPoint(
+            date=date_val,
+            daily_return=benchmark_daily_return,
+            return_pct=((benchmark_idx - 100.0) / 100.0) * 100  # 시작점 대비 누적 수익률
+        ))
+    
+    return portfolio_points, benchmark_points
 
 def parse_date_range(period: TimePeriod, portfolio_id: int, db: Session) -> tuple[date, date]:
     """기간 설정에 따른 시작일/종료일 계산"""
@@ -175,9 +275,52 @@ async def calculate_benchmark_returns_custom_period(
 ) -> list[BenchmarkReturn]:
     """Custom Period 벤치마크 대비 수익률 계산"""
     
-    # 현재는 실제 벤치마크 데이터가 없으므로 빈 리스트 반환
-    # TODO: 실제 벤치마크 지수 데이터 연동 후 활성화
-    return []
+    try:
+        # 포트폴리오 통화 조회
+        portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if not portfolio:
+            return []
+        
+        # 적절한 벤치마크 심볼 선택
+        benchmark_symbol = get_benchmark_symbol_by_currency(portfolio.currency)
+        
+        # 벤치마크 인스트루먼트 조회
+        benchmark_instrument = db.query(MarketInstrument).filter(
+            MarketInstrument.symbol == benchmark_symbol,
+            MarketInstrument.is_active == 'Yes'
+        ).first()
+        
+        if not benchmark_instrument:
+            return []
+        
+        # 벤치마크 가격 데이터 조회
+        benchmark_data = db.query(MarketPriceDaily).filter(
+            MarketPriceDaily.instrument_id == benchmark_instrument.id,
+            MarketPriceDaily.date >= start_date,
+            MarketPriceDaily.date <= end_date
+        ).order_by(MarketPriceDaily.date).all()
+        
+        if len(benchmark_data) < 2:
+            return []
+        
+        # 벤치마크 수익률 계산 (기간 시작 ~ 끝)
+        start_price = benchmark_data[0].close_price
+        end_price = benchmark_data[-1].close_price
+        benchmark_return = ((float(end_price) - float(start_price)) / float(start_price)) * 100
+        
+        # 벤치마크 대비 초과 수익률 계산
+        excess_return = portfolio_return - benchmark_return
+        
+        return [BenchmarkReturn(
+            name=benchmark_instrument.name,
+            symbol=benchmark_symbol,
+            return_pct=benchmark_return,
+            excess_return=excess_return
+        )]
+        
+    except Exception as e:
+        print(f"벤치마크 계산 오류: {str(e)}")
+        return []
 
 async def get_performance_all_time(portfolio_id: int, chart_period: str, db: Session) -> PerformanceAllTimeResponse:
     """All Time 성과 데이터 조회"""
@@ -344,6 +487,181 @@ def calculate_chart_daily_returns(portfolio_id: int, chart_period: str, end_date
 async def calculate_benchmark_returns_all_time(portfolio_id: int, db: Session) -> list[BenchmarkReturn]:
     """All Time 벤치마크 대비 수익률 계산"""
     
-    # 현재는 실제 벤치마크 데이터가 없으므로 빈 리스트 반환
-    # TODO: 실제 벤치마크 지수 데이터 (KOSPI, KOSPI200, S&P500) 연동 후 활성화
-    return []
+    try:
+        # 포트폴리오 통화 조회
+        portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if not portfolio:
+            return []
+        
+        # 포트폴리오 전체 기간의 NAV 데이터 조회
+        portfolio_navs = db.query(PortfolioNavDaily).filter(
+            PortfolioNavDaily.portfolio_id == portfolio_id
+        ).order_by(PortfolioNavDaily.as_of_date).all()
+        
+        if len(portfolio_navs) < 2:
+            return []
+        
+        start_date = portfolio_navs[0].as_of_date
+        end_date = portfolio_navs[-1].as_of_date
+        
+        # 적절한 벤치마크 심볼 선택
+        benchmark_symbol = get_benchmark_symbol_by_currency(portfolio.currency)
+        
+        # 벤치마크 인스트루먼트 조회
+        benchmark_instrument = db.query(MarketInstrument).filter(
+            MarketInstrument.symbol == benchmark_symbol,
+            MarketInstrument.is_active == 'Yes'
+        ).first()
+        
+        if not benchmark_instrument:
+            return []
+        
+        # 벤치마크 가격 데이터 조회
+        benchmark_data = db.query(MarketPriceDaily).filter(
+            MarketPriceDaily.instrument_id == benchmark_instrument.id,
+            MarketPriceDaily.date >= start_date,
+            MarketPriceDaily.date <= end_date
+        ).order_by(MarketPriceDaily.date).all()
+        
+        if len(benchmark_data) < 2:
+            return []
+        
+        # 포트폴리오 수익률 계산 (전체 기간)
+        start_nav = float(portfolio_navs[0].nav)
+        end_nav = float(portfolio_navs[-1].nav)
+        portfolio_return = ((end_nav - start_nav) / start_nav) * 100
+        
+        # 벤치마크 수익률 계산 (전체 기간)
+        start_price = float(benchmark_data[0].close_price)
+        end_price = float(benchmark_data[-1].close_price)
+        benchmark_return = ((end_price - start_price) / start_price) * 100
+        
+        # 벤치마크 대비 초과 수익률 계산
+        excess_return = portfolio_return - benchmark_return
+        
+        return [BenchmarkReturn(
+            name=benchmark_instrument.name,
+            symbol=benchmark_symbol,
+            return_pct=benchmark_return,
+            excess_return=excess_return
+        )]
+        
+    except Exception as e:
+        print(f"벤치마크 계산 오류: {str(e)}")
+        return []
+ 
+async def get_benchmark_comparison_chart(portfolio_id: int, period: str, db: Session):
+    """포트폴리오 vs 벤치마크 비교 차트 데이터 조회"""
+    try:
+        # 포트폴리오 정보 조회
+        portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+        # 기간별 날짜 범위 계산
+        today = date.today()
+        if period == "1w":
+            start_date = today - timedelta(weeks=1)
+        elif period == "1m":
+            start_date = today - timedelta(days=30)
+        else:  # "all"
+            start_date = None  # 전체 기간
+        
+        # 포트폴리오 NAV 데이터 조회
+        nav_query = db.query(PortfolioNavDaily).filter(
+            PortfolioNavDaily.portfolio_id == portfolio_id
+        )
+        if start_date:
+            nav_query = nav_query.filter(PortfolioNavDaily.as_of_date >= start_date)
+        
+        portfolio_navs = nav_query.order_by(PortfolioNavDaily.as_of_date).all()
+        
+        if not portfolio_navs:
+            return {
+                "period": period,
+                "portfolio_data": [],
+                "benchmark_data": [],
+                "message": "No data available"
+            }
+        
+        # 벤치마크 선택
+        benchmark_symbol = get_benchmark_symbol_by_currency(portfolio.currency)
+        benchmark_instrument = db.query(MarketInstrument).filter(
+            MarketInstrument.symbol == benchmark_symbol,
+            MarketInstrument.is_active == 'Yes'
+        ).first()
+        
+        if not benchmark_instrument:
+            return {
+                "period": period,
+                "portfolio_data": [],
+                "benchmark_data": [],
+                "message": f"Benchmark {benchmark_symbol} not found"
+            }
+        
+        # 벤치마크 가격 데이터 조회
+        benchmark_query = db.query(MarketPriceDaily).filter(
+            MarketPriceDaily.instrument_id == benchmark_instrument.id
+        )
+        if start_date:
+            benchmark_query = benchmark_query.filter(MarketPriceDaily.date >= start_date)
+        
+        benchmark_prices = benchmark_query.order_by(MarketPriceDaily.date).all()
+        
+        # 공통 날짜 범위에서 데이터 정렬
+        portfolio_data = []
+        benchmark_data = []
+        
+        # 포트폴리오 NAV를 딕셔너리로 변환 (빠른 조회)
+        nav_dict = {nav.as_of_date: float(nav.nav) for nav in portfolio_navs}
+        benchmark_dict = {price.date: float(price.close_price) for price in benchmark_prices}
+        
+        # 공통 날짜 찾기
+        common_dates = sorted(set(nav_dict.keys()) & set(benchmark_dict.keys()))
+        
+        if not common_dates:
+            return {
+                "period": period,
+                "portfolio_data": [],
+                "benchmark_data": [],
+                "message": "No overlapping data between portfolio and benchmark"
+            }
+        
+        # 지수화를 위한 기준값 (첫 번째 날의 값)
+        base_nav = nav_dict[common_dates[0]]
+        base_benchmark = benchmark_dict[common_dates[0]]
+        
+        # 지수화된 데이터 생성
+        for date_val in common_dates:
+            nav_value = nav_dict[date_val]
+            benchmark_value = benchmark_dict[date_val]
+            
+            # 100을 기준으로 지수화
+            indexed_nav = (nav_value / base_nav) * 100
+            indexed_benchmark = (benchmark_value / base_benchmark) * 100
+            
+            portfolio_data.append({
+                "date": date_val.isoformat(),
+                "value": indexed_nav
+            })
+            
+            benchmark_data.append({
+                "date": date_val.isoformat(),
+                "value": indexed_benchmark,
+                "name": benchmark_instrument.name
+            })
+        
+        return {
+            "period": period,
+            "portfolio_name": portfolio.name,
+            "benchmark_name": benchmark_instrument.name,
+            "benchmark_symbol": benchmark_symbol,
+            "portfolio_data": portfolio_data,
+            "benchmark_data": benchmark_data,
+            "start_date": common_dates[0].isoformat() if common_dates else None,
+            "end_date": common_dates[-1].isoformat() if common_dates else None
+        }
+        
+    except Exception as e:
+        print(f"벤치마크 비교 차트 조회 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

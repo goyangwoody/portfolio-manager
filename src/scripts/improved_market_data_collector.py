@@ -13,10 +13,10 @@ from pathlib import Path
 import time
 
 # 프로젝트 루트를 sys.path에 추가
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from pm.db.models import (
+from src.pm.db.models import (
     MarketInstrument, MarketPriceDaily, RiskFreeRateDaily, MarketDataHelper,
     SessionLocal, engine, Base
 )
@@ -196,6 +196,8 @@ class ImprovedMarketDataCollector:
             
             for i, instrument in enumerate(rate_instruments):
                 try:
+                    print(f"\n🔄 {instrument.symbol} ({instrument.name}) 처리 중...")
+                    
                     if instrument.symbol == 'KOR_BASE_RATE':
                         # 한국은행 기준금리는 수동 데이터 사용
                         new_count, existing_count = self._collect_kr_base_rate(db, instrument, start_date, end_date)
@@ -211,6 +213,8 @@ class ImprovedMarketDataCollector:
                 except Exception as e:
                     rate_progress.update(1, f"❌ {instrument.symbol}: 오류")
                     print(f"\n    ⚠️  오류: {instrument.symbol} 금리 데이터 수집 실패 - {str(e)}")
+                    import traceback
+                    traceback.print_exc()
                     continue
             
             print(f"\n🎉 무위험 이자율 데이터 수집 완료!")
@@ -222,86 +226,109 @@ class ImprovedMarketDataCollector:
 
     def _collect_us_treasury_rate(self, db, instrument: MarketInstrument, start_date: str, end_date: str):
         """미국 국채 이자율 수집"""
-        # Yahoo Finance에서 데이터 가져오기
-        ticker = yf.Ticker(instrument.symbol)
-        hist = ticker.history(start=start_date, end=end_date)
-        
-        if hist.empty:
-            return 0, 0  # 신규 0건, 기존 0건
-        
-        new_records = 0
-        existing_records = 0
-        
-        # 데이터베이스에 저장
-        for date_idx, row in hist.iterrows():
-            # 기존 데이터 확인
-            existing = db.query(RiskFreeRateDaily).filter(
-                RiskFreeRateDaily.instrument_id == instrument.id,
-                RiskFreeRateDaily.date == date_idx.date()
-            ).first()
+        try:
+            # Yahoo Finance에서 데이터 가져오기
+            ticker = yf.Ticker(instrument.symbol)
+            hist = ticker.history(start=start_date, end=end_date)
             
-            if existing:
-                existing_records += 1
-                continue  # 이미 존재하는 데이터는 스킵
+            if hist.empty:
+                print(f"⚠️  {instrument.symbol}: Yahoo Finance에서 데이터를 찾을 수 없습니다.")
+                return 0, 0  # 신규 0건, 기존 0건
             
-            # 새 데이터 추가 (Yahoo Finance에서는 이자율이 Close 값으로 제공됨)
-            rate_data = RiskFreeRateDaily(
-                instrument_id=instrument.id,
-                date=date_idx.date(),
-                rate=row['Close']
-            )
-            db.add(rate_data)
-            new_records += 1
-        
-        db.commit()
-        return new_records, existing_records
+            new_records = 0
+            existing_records = 0
+            
+            # 데이터베이스에 저장
+            for date_idx, row in hist.iterrows():
+                # 기존 데이터 확인
+                existing = db.query(RiskFreeRateDaily).filter(
+                    RiskFreeRateDaily.instrument_id == instrument.id,
+                    RiskFreeRateDaily.date == date_idx.date()
+                ).first()
+                
+                if existing:
+                    existing_records += 1
+                    continue  # 이미 존재하는 데이터는 스킵
+                
+                # 새 데이터 추가 (Yahoo Finance에서는 이자율이 Close 값으로 제공됨)
+                rate_data = RiskFreeRateDaily(
+                    instrument_id=instrument.id,
+                    date=date_idx.date(),
+                    rate=row['Close'],
+                    rate_type='TREASURY_RATE'
+                )
+                db.add(rate_data)
+                new_records += 1
+            
+            db.commit()
+            return new_records, existing_records
+            
+        except Exception as e:
+            print(f"❌ {instrument.symbol} 국채 이자율 수집 오류: {str(e)}")
+            db.rollback()
+            return 0, 0
 
     def _collect_kr_base_rate(self, db, instrument: MarketInstrument, start_date: str, end_date: str):
         """한국은행 기준금리 수집 (수동 데이터)"""
-        # 예시: 2024년 한국은행 기준금리 (실제 데이터로 교체 필요)
-        sample_rates = [
-            {'date': '2000-01-01', 'rate': 5.00},  # 2000년 초기 금리
-            {'date': '2008-10-01', 'rate': 2.00},  # 금융위기 시 인하
-            {'date': '2020-03-01', 'rate': 0.75},  # 코로나19 대응
-            {'date': '2022-01-01', 'rate': 1.25},  # 인플레이션 대응
-            {'date': '2023-01-01', 'rate': 3.25},  # 추가 인상
-            {'date': '2024-01-01', 'rate': 3.50},  # 2024년 금리
-            {'date': '2024-11-28', 'rate': 3.00},  # 2024년 11월 기준금리 인하
-        ]
-        
-        start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
-        end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
-        new_records = 0
-        existing_records = 0
-        
-        for rate_info in sample_rates:
-            rate_date = datetime.strptime(rate_info['date'], '%Y-%m-%d').date()
+        try:
+            # 예시: 2024년 한국은행 기준금리 (실제 데이터로 교체 필요)
+            sample_rates = [
+                {'date': '2020-01-01', 'rate': 1.25},  # 2020년 초기
+                {'date': '2020-03-16', 'rate': 0.75},  # 코로나19 1차 인하
+                {'date': '2020-05-28', 'rate': 0.50},  # 코로나19 2차 인하
+                {'date': '2021-08-26', 'rate': 0.75},  # 정상화 시작
+                {'date': '2021-11-25', 'rate': 1.00},  # 추가 인상
+                {'date': '2022-01-14', 'rate': 1.25},  # 인플레이션 대응
+                {'date': '2022-04-14', 'rate': 1.50},  # 추가 인상
+                {'date': '2022-05-26', 'rate': 1.75},  # 추가 인상
+                {'date': '2022-07-13', 'rate': 2.25},  # 추가 인상
+                {'date': '2022-08-25', 'rate': 2.50},  # 추가 인상
+                {'date': '2022-10-12', 'rate': 3.00},  # 추가 인상
+                {'date': '2022-11-24', 'rate': 3.25},  # 추가 인상
+                {'date': '2023-01-13', 'rate': 3.50},  # 최고점
+                {'date': '2024-10-11', 'rate': 3.25},  # 인하 시작
+                {'date': '2024-11-28', 'rate': 3.00},  # 추가 인하
+            ]
             
-            # 날짜 범위 확인
-            if rate_date < start_dt or rate_date > end_dt:
-                continue
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+            new_records = 0
+            existing_records = 0
             
-            # 기존 데이터 확인
-            existing = db.query(RiskFreeRateDaily).filter(
-                RiskFreeRateDaily.instrument_id == instrument.id,
-                RiskFreeRateDaily.date == rate_date
-            ).first()
+            for rate_info in sample_rates:
+                rate_date = datetime.strptime(rate_info['date'], '%Y-%m-%d').date()
+                
+                # 날짜 범위 확인
+                if rate_date < start_dt or rate_date > end_dt:
+                    continue
+                
+                # 기존 데이터 확인
+                existing = db.query(RiskFreeRateDaily).filter(
+                    RiskFreeRateDaily.instrument_id == instrument.id,
+                    RiskFreeRateDaily.date == rate_date
+                ).first()
+                
+                if existing:
+                    existing_records += 1
+                    continue  # 이미 존재하는 데이터는 스킵
+                
+                # 새 데이터 추가
+                rate_data = RiskFreeRateDaily(
+                    instrument_id=instrument.id,
+                    date=rate_date,
+                    rate=rate_info['rate'],
+                    rate_type='CENTRAL_BANK_RATE'
+                )
+                db.add(rate_data)
+                new_records += 1
             
-            if existing:
-                existing_records += 1
-                continue  # 이미 존재하는 데이터는 스킵
+            db.commit()
+            return new_records, existing_records
             
-            # 새 데이터 추가
-            rate_data = RiskFreeRateDaily(
-                instrument_id=instrument.id,
-                date=rate_date,
-                rate=rate_info['rate']
-            )
-            db.add(rate_data)
-            new_records += 1
-        
-        db.commit()
-        return new_records, existing_records
+        except Exception as e:
+            print(f"\n❌ 한국은행 기준금리 수집 오류: {str(e)}")
+            db.rollback()
+            return 0, 0
 
     def collect_all_data(self, start_date: str, end_date: str = None) -> None:
         """모든 시장 데이터 수집"""
@@ -382,14 +409,13 @@ class ImprovedMarketDataCollector:
 def main():
     """메인 실행 함수"""
     collector = ImprovedMarketDataCollector()
+
+    # 2025년부터 현재까지 데이터 수집
+    start_date = "2025-01-01"
     
-    # 2000년 1월 1일부터 현재까지 모든 데이터 수집
-    start_date = '2000-01-01'
-    
-    print(f"📊 장기간 시장 데이터 수집을 시작합니다.")
+    print(f"📊 시장 데이터 수집을 시작합니다.")
     print(f"📅 수집 기간: {start_date} ~ 현재")
     print(f"🏗️ 개선된 정규화 구조 사용")
-    print(f"⏰ 대량 데이터이므로 시간이 오래 걸릴 수 있습니다...")
     
     try:
         # 데이터 수집
@@ -400,6 +426,8 @@ def main():
         
     except Exception as e:
         print(f"데이터 수집 중 오류 발생: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

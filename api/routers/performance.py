@@ -7,7 +7,7 @@ from typing import Optional
 
 from database import get_db
 from schemas import PerformanceAllTimeResponse, PerformanceCustomPeriodResponse
-from services.performance import get_performance_all_time, get_performance_custom_period
+from services.performance import get_performance_all_time, get_performance_custom_period, get_benchmark_comparison_chart
 
 router = APIRouter(prefix="/portfolios/{portfolio_id}/performance", tags=["performance"])
 
@@ -38,4 +38,20 @@ async def get_portfolio_performance(
         raise
     except Exception as e:
         print(f"Error in get_portfolio_performance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/benchmark-comparison")
+async def get_benchmark_comparison(
+    portfolio_id: int,
+    period: str = Query("all", description="분석 기간 (all/1m/1w)"),
+    db: Session = Depends(get_db)
+):
+    """포트폴리오 vs 벤치마크 비교 차트 데이터 조회"""
+    try:
+        return await get_benchmark_comparison_chart(portfolio_id, period, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in get_benchmark_comparison: {e}")
         raise HTTPException(status_code=500, detail=str(e))
