@@ -65,10 +65,7 @@ export default function RiskAllocation() {
       queryKey: ["/api/portfolios", newPortfolio.id, "attribution"] 
     });
     queryClient.invalidateQueries({ 
-      queryKey: ["/api/portfolios", newPortfolio.id, "risk"] 
-    });
-    queryClient.invalidateQueries({ 
-      queryKey: ["/api/portfolios", newPortfolio.id, "sectors"] 
+      queryKey: ["/api/portfolios", newPortfolio.id, "risk-allocation"] 
     });
   };
 
@@ -77,15 +74,19 @@ export default function RiskAllocation() {
     enabled: !!portfolio?.id,
   });
 
-  const { data: riskMetrics } = useQuery<RiskMetrics>({
-    queryKey: ["/api/portfolios", portfolio?.id, "risk"],
+  const { data: riskAndAllocationData } = useQuery<any>({
+    queryKey: ["/api/portfolios", portfolio?.id, "risk-allocation"],
+    queryFn: async () => {
+      const response = await fetch(`/api/portfolios/${portfolio?.id}/risk-allocation`);
+      if (!response.ok) throw new Error('Failed to fetch risk allocation data');
+      return response.json();
+    },
     enabled: !!portfolio?.id,
   });
 
-  const { data: sectorAllocations } = useQuery<SectorAllocation[]>({
-    queryKey: ["/api/portfolios", portfolio?.id, "sectors"],
-    enabled: !!portfolio?.id,
-  });
+  // 백엔드 응답에서 데이터 분리
+  const riskMetrics = riskAndAllocationData?.risk_metrics;
+  const sectorAllocations = riskAndAllocationData?.sector_allocation;
 
   if (!portfolio) {
     return (

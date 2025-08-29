@@ -150,49 +150,175 @@ export interface PortfolioHoldingsResponse {
 }
 
 // ================================
-// ATTRIBUTION TYPES  
+// ATTRIBUTION TYPES (TWR 기반)
 // ================================
 
-export interface AssetClassAttributionResponse {
-  id: string;
-  asset_class: string;
-  allocation: number;       // 비중 (%)
-  contribution: number;     // 기여도 (%)
-  
-  // 기존 필드명과의 호환성
-  assetClass: string;
+// 자산 필터 옵션
+export type AssetFilter = "all" | "domestic" | "foreign";
+
+// 일별 포트폴리오 수익률
+export interface DailyPortfolioReturn {
+  date: string;            // Date -> string in JSON
+  daily_return: number;    // 일별 포트폴리오 수익률 (%)
+  portfolio_value?: number; // 포트폴리오 가치 (선택적)
 }
 
-export interface TopContributorResponse {
-  id: string;
+// 자산별 비중 변화 추이
+export interface AssetWeightTrend {
+  date: string;            // Date -> string in JSON  
+  weight: number;          // 자산 비중 (%)
+}
+
+// 자산별 TWR 수익률 추이
+export interface AssetReturnTrend {
+  date: string;            // Date -> string in JSON
+  cumulative_twr: number;  // 누적 TWR 수익률 (%)
+  daily_twr: number;       // 일별 TWR 수익률 (%)
+}
+
+// 개별 자산 기여도 (TWR 기반)
+export interface AssetContribution {
+  asset_id: number;
+  ticker: string;
   name: string;
-  contribution: number;     // 기여도 (%)
-  weight: number;          // 비중 (%)
-  return_rate: number;     // 수익률 (%)
-  type: "contributor" | "detractor";
+  asset_class: string;
+  region: string;          // domestic/foreign
   
-  // 기존 필드명과의 호환성
-  return: number;
+  // 현재 상태
+  current_allocation: number;  // 현재 비중 (%)
+  current_price?: number;      // 현재가
+  
+  // 기간별 통계
+  avg_weight: number;      // 평균 비중 (%)
+  period_return: number;   // 자산 기간 TWR 수익률 (%)
+  contribution: number;    // 포트폴리오 수익률 기여도 (%)
+  
+  // 상세 데이터 (드릴다운용)
+  weight_trend?: AssetWeightTrend[]; // 비중 변화 추이
+  return_trend?: AssetReturnTrend[]; // TWR 수익률 추이
 }
 
-export interface AttributionAnalysisResponse {
-  asset_class_attribution: AssetClassAttributionResponse[];
-  top_contributors: TopContributorResponse[];
-  top_detractors: TopContributorResponse[];
+// 자산클래스별 기여도 (TWR 기반)
+export interface AssetClassContribution {
+  asset_class: string;     // 자산 클래스명
+  
+  // 현재 상태
+  current_allocation: number; // 현재 비중 (%)
+  
+  // 기간별 통계
+  avg_weight: number;      // 평균 비중 (%)
+  contribution: number;    // 포트폴리오 수익률 기여도 (%)
+  
+  // 차트 데이터
+  weight_trend: AssetWeightTrend[]; // 자산클래스 비중 변화 추이
+  return_trend: AssetReturnTrend[]; // 자산클래스 TWR 수익률 추이
+  
+  // 구성 자산들
+  assets: AssetContribution[]; // 자산클래스 내 자산들
+}
+
+// 개별 자산 가격 성과 데이터
+export interface PricePerformancePoint {
+  date: string;            // Date -> string in JSON
+  price: number;           // 자산 가격
+  normalized_value: number; // 정규화된 가치 (기준일=100)
+}
+
+// 개별 자산 상세 정보 (드릴다운용)
+export interface AssetDetailResponse {
+  asset_id: number;
+  ticker: string;
+  name: string;
+  asset_class: string;
+  region: string;
+  
+  // 현재 포지션 정보
+  current_allocation: number; // 현재 비중 (%)
+  current_price: number;      // 현재가
+  nav_return: number;         // NAV 수익률 (%)
+  twr_contribution: number;   // TWR 기여도 (%)
+  
+  // 차트 데이터
+  price_performance: PricePerformancePoint[]; // 가격 성과 차트
+}
+
+// All Time 기여도 분석 응답
+export interface AttributionAllTimeResponse {
+  // 포트폴리오 전체 성과
+  total_twr: number;       // 총 TWR 수익률 (%)
+  daily_returns: DailyPortfolioReturn[]; // 일별 포트폴리오 수익률
+  
+  // 자산클래스별 기여도 (차트 데이터 포함)
+  asset_class_contributions: AssetClassContribution[]; // 자산클래스별 기여도
+  
+  // 상위/하위 기여 자산
+  top_contributors: AssetContribution[];   // 상위 기여 자산
+  top_detractors: AssetContribution[];     // 상위 손실 자산
+  
+  // 필터 정보
+  asset_filter: AssetFilter; // 적용된 자산 필터
+  
+  // 기간 정보
+  period: string;          // TimePeriod enum value
+  start_date: string;      // Date -> string in JSON
+  end_date: string;        // Date -> string in JSON
+  
+  // 검증용 (디버깅)
+  total_contribution_check?: number; // 총 기여도 합계 검증값
+}
+
+// Specific Period 기여도 분석 응답
+export interface AttributionSpecificPeriodResponse {
+  // 포트폴리오 전체 성과
+  period_twr: number;      // 기간 TWR 수익률 (%)
+  daily_returns: DailyPortfolioReturn[]; // 기간 중 일별 포트폴리오 수익률
+  
+  // 자산클래스별 기여도 (기간 중)
+  asset_class_contributions: AssetClassContribution[]; // 기간 중 자산클래스별 기여도
+  
+  // 상위/하위 기여 자산 (기간 중)
+  top_contributors: AssetContribution[];   // 기간 중 상위 기여 자산
+  top_detractors: AssetContribution[];     // 기간 중 상위 손실 자산
+  
+  // 필터 정보
+  asset_filter: AssetFilter; // 적용된 자산 필터
+  
+  // 기간 정보
+  start_date: string;      // 분석 시작일 (Date -> string in JSON)
+  end_date: string;        // 분석 종료일 (Date -> string in JSON)
+  period_type: string;     // 기간 타입 (week/month/custom)
+  
+  // 검증용
+  total_contribution_check?: number; // 총 기여도 합계 검증값
+}
+
+// Custom Period 기여도 분석 응답 (레거시)
+export interface AttributionCustomPeriodResponse {
+  // 포트폴리오 전체 성과
+  period_twr: number;      // 기간 TWR 수익률 (%)
+  daily_returns: DailyPortfolioReturn[]; // 기간 중 일별 포트폴리오 수익률
+  
+  // 자산클래스별 기여도
+  asset_class_contributions: AssetClassContribution[]; // 자산클래스별 기여도
+  
+  // 상위/하위 기여 자산
+  top_contributors: AssetContribution[];   // 상위 기여 자산 (top 5)
+  top_detractors: AssetContribution[];     // 상위 손실 자산 (top 5)
+  
+  // 기간 정보
+  start_date: string;      // 분석 시작일 (Date -> string in JSON)
+  end_date: string;        // 분석 종료일 (Date -> string in JSON)
+  period_type: string;     // 기간 타입 (week/month)
+  
+  // 검증용
+  total_contribution_check?: number; // 총 기여도 합계 검증값
 }
 
 // ================================
-// LEGACY COMPATIBILITY TYPES
+// LEGACY ATTRIBUTION TYPES (REMOVED)
 // ================================
-
-// 기존 코드와의 호환성을 위한 타입들
-export interface AttributionData extends AssetClassAttributionResponse {
-  assetClass: string;
-}
-
-export interface Holding extends TopContributorResponse {
-  return: number;
-}
+// Legacy attribution types have been removed to use only TWR-based attribution
+// Use AttributionAllTimeResponse, AttributionSpecificPeriodResponse instead
 
 export interface Asset extends AssetHoldingResponse {
   portfolioId: string;

@@ -1,7 +1,7 @@
 페이지 별 표시할 정보
 
 Overview
-
+-
 -domestic/foreign select
 
 KPI Card
@@ -39,10 +39,10 @@ Attribution
 
 all time
 -attribution by asset class (일단위 TWR 수익률)
-->current allcoation, contribution
+각 자산 클릭 시 current allcoation, contribution과 차트 표시
  chart: allocation weight trend(%), return trend(TWR)
 -Top n Contributors/Detractors (allocation/nav return/twr contribution) 
--> individual asset card with price performance
+각 자산 클릭 시 individual asset card with price performance
 
 specific period
 -attribution by asset class during the period (TWR)

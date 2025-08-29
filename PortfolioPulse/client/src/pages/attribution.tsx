@@ -2,16 +2,27 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
-import { ChevronLeft, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { ChevronLeft, TrendingUp, TrendingDown, PieChart, Filter } from "lucide-react";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import type { Portfolio, AttributionData, Holding } from "@shared/types";
+import type { 
+  Portfolio, 
+  AttributionAllTimeResponse,
+  AttributionSpecificPeriodResponse,
+  AssetClassContribution,
+  AssetContribution,
+  AssetDetailResponse,
+  AssetFilter
+} from "@shared/types";
 
 export default function Attribution() {
   const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
+  const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
   const [selectedAssetClass, setSelectedAssetClass] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { data: portfolios } = useQuery<Portfolio[]>({
@@ -31,20 +42,62 @@ export default function Attribution() {
     queryClient.invalidateQueries({ 
       queryKey: ["/api/portfolios", newPortfolio.id, "attribution"] 
     });
+  };
+
+  const handleAssetFilterChange = (filter: AssetFilter) => {
+    setAssetFilter(filter);
+    // 필터 변경 시 데이터 다시 로드
     queryClient.invalidateQueries({ 
-      queryKey: ["/api/portfolios", newPortfolio.id, "holdings"] 
+      queryKey: ["/api/portfolios", portfolio?.id, "attribution"] 
     });
   };
 
-  const { data: attributionData } = useQuery<AttributionData[]>({
-    queryKey: ["/api/portfolios", portfolio?.id, "attribution"],
-    enabled: !!portfolio?.id,
+  // TWR 기반 All Time 기여도 데이터
+  const { data: allTimeAttributionData } = useQuery<AttributionAllTimeResponse>({
+    queryKey: ["/api/portfolios", portfolio?.id, "attribution", "all-time", assetFilter],
+    queryFn: async () => {
+      const response = await fetch(`/api/portfolios/${portfolio?.id}/attribution/all-time?asset_filter=${assetFilter}`);
+      if (!response.ok) throw new Error('Failed to fetch attribution data');
+      return response.json();
+    },
+    enabled: !!portfolio?.id && timePeriod === "all",
   });
 
-  const { data: contributors } = useQuery<Holding[]>({
-    queryKey: ["/api/portfolios", portfolio?.id, "holdings"],
-    enabled: !!portfolio?.id,
+  // TWR 기반 Specific Period 기여도 데이터 (필요시 구현)
+  const { data: specificPeriodAttributionData } = useQuery<AttributionSpecificPeriodResponse>({
+    queryKey: ["/api/portfolios", portfolio?.id, "attribution", "specific-period", assetFilter, timePeriod],
+    queryFn: async () => {
+      // 실제로는 TimePeriod에 따라 start_date, end_date를 계산해야 함
+      const endDate = new Date().toISOString().split('T')[0];
+      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 30일 전
+      
+      const response = await fetch(
+        `/api/portfolios/${portfolio?.id}/attribution/specific-period?start_date=${startDate}&end_date=${endDate}&asset_filter=${assetFilter}&period_type=month`
+      );
+      if (!response.ok) throw new Error('Failed to fetch attribution data');
+      return response.json();
+    },
+    enabled: !!portfolio?.id && timePeriod !== "all",
   });
+
+  // 개별 자산 상세 정보
+  const { data: assetDetailData } = useQuery<AssetDetailResponse>({
+    queryKey: ["/api/portfolios", portfolio?.id, "attribution", "asset-detail", selectedAssetId],
+    queryFn: async () => {
+      const response = await fetch(`/api/portfolios/${portfolio?.id}/attribution/asset-detail/${selectedAssetId}`);
+      if (!response.ok) throw new Error('Failed to fetch asset detail');
+      return response.json();
+    },
+    enabled: !!portfolio?.id && !!selectedAssetId,
+  });
+
+  // 현재 사용할 데이터 결정
+  const currentAttributionData = timePeriod === "all" ? allTimeAttributionData : specificPeriodAttributionData;
+
+  // TWR 기반 데이터 사용 (레거시 변환 제거)
+  const assetClassContributions = currentAttributionData?.asset_class_contributions || [];
+  const topContributors = currentAttributionData?.top_contributors || [];
+  const topDetractors = currentAttributionData?.top_detractors || [];
 
   if (!portfolio) {
     return (
@@ -56,52 +109,13 @@ export default function Attribution() {
     );
   }
 
-  const topContributors = contributors?.filter(h => h.type === "contributor") || [];
-  const topDetractors = contributors?.filter(h => h.type === "detractor") || [];
-
   const getAssetClassColor = (index: number) => {
     const colors = ["bg-primary", "bg-success", "bg-warning", "bg-danger"];
     return colors[index % colors.length];
   };
 
-  // Generate mock detailed data for asset class
-  const getAssetClassDetails = (assetClass: string, allocation: string, contribution: string) => {
-    const trendData = [
-      { month: "Jan", value: parseFloat(allocation) * 0.95 },
-      { month: "Feb", value: parseFloat(allocation) * 1.02 },
-      { month: "Mar", value: parseFloat(allocation) * 0.98 },
-      { month: "Apr", value: parseFloat(allocation) * 1.05 },
-      { month: "May", value: parseFloat(allocation) * 1.08 },
-      { month: "Jun", value: parseFloat(allocation) }
-    ];
-    
-    const returnData = [
-      { month: "Jan", return: parseFloat(contribution) * 0.8 },
-      { month: "Feb", return: parseFloat(contribution) * 1.2 },
-      { month: "Mar", return: parseFloat(contribution) * 0.9 },
-      { month: "Apr", return: parseFloat(contribution) * 1.1 },
-      { month: "May", return: parseFloat(contribution) * 1.3 },
-      { month: "Jun", return: parseFloat(contribution) }
-    ];
-
-    return { trendData, returnData };
-  };
-
   // Render detailed asset view (for contributors/detractors)
-  if (selectedAsset) {
-    const assetHolding = contributors?.find(h => h.name === selectedAsset);
-    if (!assetHolding) return null;
-    
-    // Generate mock performance data for the asset
-    const assetPerformanceData = [
-      { date: "Jan", price: 150.25 },
-      { date: "Feb", price: 155.30 },
-      { date: "Mar", price: 148.90 },
-      { date: "Apr", price: 162.40 },
-      { date: "May", price: 168.75 },
-      { date: "Jun", price: 175.80 }
-    ];
-    
+  if (selectedAsset && assetDetailData) {
     return (
       <div className="max-w-md mx-auto px-4 py-6 pb-20">
         {/* Header with Back Button */}
@@ -109,14 +123,17 @@ export default function Attribution() {
           <Button
             variant="ghost" 
             size="sm"
-            onClick={() => setSelectedAsset(null)}
+            onClick={() => {
+              setSelectedAsset(null);
+              setSelectedAssetId(null);
+            }}
             className="mr-3 p-2"
             data-testid="button-back-asset"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text">
-            {assetHolding.name}
+            {assetDetailData.name}
           </h1>
         </div>
 
@@ -129,30 +146,30 @@ export default function Attribution() {
                   Allocation
                 </div>
                 <div className="text-lg font-bold text-primary" data-testid="text-asset-allocation">
-                  {assetHolding.weight}%
+                  {assetDetailData.current_allocation.toFixed(1)}%
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                  Return
+                  NAV Return
                 </div>
-                <div className={`text-lg font-bold ${assetHolding.return >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-return">
-                  {assetHolding.return >= 0 ? '+' : ''}{assetHolding.return}%
+                <div className={`text-lg font-bold ${assetDetailData.nav_return >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-return">
+                  {assetDetailData.nav_return >= 0 ? '+' : ''}{assetDetailData.nav_return.toFixed(1)}%
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                  Contribution
+                  TWR Contribution
                 </div>
-                <div className={`text-lg font-bold ${assetHolding.contribution >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-contribution">
-                  {assetHolding.contribution >= 0 ? '+' : ''}{assetHolding.contribution}%
+                <div className={`text-lg font-bold ${assetDetailData.twr_contribution >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-asset-contribution">
+                  {assetDetailData.twr_contribution >= 0 ? '+' : ''}{assetDetailData.twr_contribution.toFixed(2)}%
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Price Chart */}
+        {/* Price Performance Chart */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center mb-4">
@@ -163,7 +180,10 @@ export default function Attribution() {
             </div>
             <div className="h-64" data-testid="chart-asset-performance">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={assetPerformanceData}>
+                <LineChart data={assetDetailData.price_performance.map(p => ({
+                  date: new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                  price: p.normalized_value
+                }))}>
                   <XAxis 
                     dataKey="date"
                     axisLine={false}
@@ -194,14 +214,19 @@ export default function Attribution() {
 
   // Render detailed asset class view
   if (selectedAssetClass) {
-    const assetClassData = attributionData?.find(attr => attr.assetClass === selectedAssetClass);
+    const assetClassData = currentAttributionData?.asset_class_contributions?.find(ac => ac.asset_class === selectedAssetClass);
     if (!assetClassData) return null;
     
-    const { trendData, returnData } = getAssetClassDetails(
-      assetClassData.assetClass, 
-      assetClassData.allocation, 
-      assetClassData.contribution
-    );
+    // 차트 데이터 변환
+    const trendData = assetClassData.weight_trend?.map(wt => ({
+      month: new Date(wt.date).toLocaleDateString('en-US', { month: 'short' }),
+      value: wt.weight
+    })) || [];
+    
+    const returnData = assetClassData.return_trend?.map(rt => ({
+      month: new Date(rt.date).toLocaleDateString('en-US', { month: 'short' }),
+      return: rt.cumulative_twr
+    })) || [];
     
     return (
       <div className="max-w-md mx-auto px-4 py-6 pb-20">
@@ -217,7 +242,7 @@ export default function Attribution() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text">
-            {assetClassData.assetClass}
+            {assetClassData.asset_class}
           </h1>
         </div>
 
@@ -230,7 +255,7 @@ export default function Attribution() {
                   Current Allocation
                 </div>
                 <div className="text-2xl font-bold text-primary" data-testid="text-allocation-value">
-                  {assetClassData.allocation}%
+                  {assetClassData.current_allocation.toFixed(1)}%
                 </div>
               </div>
               <div>
@@ -238,14 +263,14 @@ export default function Attribution() {
                   Contribution
                 </div>
                 <div className={`text-2xl font-bold ${assetClassData.contribution >= 0 ? 'text-success' : 'text-danger'}`} data-testid="text-contribution-value">
-                  {assetClassData.contribution >= 0 ? '+' : ''}{assetClassData.contribution}%
+                  {assetClassData.contribution >= 0 ? '+' : ''}{assetClassData.contribution.toFixed(2)}%
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Market Value Trend */}
+        {/* Allocation Weight Trend */}
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="flex items-center mb-4">
@@ -282,13 +307,13 @@ export default function Attribution() {
           </CardContent>
         </Card>
 
-        {/* Return Trend */}
+        {/* TWR Return Trend */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center mb-4">
               <PieChart className="h-4 w-4 text-success mr-2" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
-                Return Trend
+                TWR Return Trend
               </h3>
             </div>
             <div className="h-48" data-testid="chart-return-trend">
@@ -324,14 +349,36 @@ export default function Attribution() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Combined Portfolio and Time Period Selector */}
+      {/* Time Period Selector */}
       <TimePeriodSelector
         value={timePeriod}
         onChange={handleTimePeriodChange}
-        className="mb-6"
-        onPortfolioChange={handlePortfolioChange}
-        currentPortfolio={portfolio}
+        className="mb-4"
       />
+
+      {/* Asset Filter */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <span className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                Asset Filter
+              </span>
+            </div>
+            <Select value={assetFilter} onValueChange={(value: AssetFilter) => handleAssetFilterChange(value)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="domestic">Domestic</SelectItem>
+                <SelectItem value="foreign">Foreign</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Asset Class Attribution */}
       <Card className="mb-6">
@@ -340,23 +387,23 @@ export default function Attribution() {
             Attribution by Asset Class
           </h3>
           <div className="space-y-3">
-            {attributionData?.map((attribution, index) => {
+            {assetClassContributions?.map((attribution, index) => {
               const isPositive = attribution.contribution > 0;
               return (
                 <div 
-                  key={attribution.id} 
+                  key={attribution.asset_class} 
                   className="flex justify-between items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors" 
                   data-testid={`attribution-${index}`}
-                  onClick={() => setSelectedAssetClass(attribution.assetClass)}
+                  onClick={() => setSelectedAssetClass(attribution.asset_class)}
                 >
                   <div className="flex items-center space-x-3">
                     <div className={`w-3 h-3 ${getAssetClassColor(index)} rounded-full`}></div>
                     <span className="font-medium text-gray-900 dark:text-dark-text">
-                      {attribution.assetClass}
+                      {attribution.asset_class}
                     </span>
                   </div>
                   <span className={`font-medium ${isPositive ? 'text-success' : 'text-danger'}`}>
-                    {isPositive ? '+' : ''}{attribution.contribution}%
+                    {isPositive ? '+' : ''}{attribution.contribution.toFixed(2)}%
                   </span>
                 </div>
               );
@@ -379,25 +426,28 @@ export default function Attribution() {
             {topContributors.length > 0 ? (
               topContributors.map((contributor, index) => (
                 <div 
-                  key={contributor.id} 
+                  key={contributor.asset_id} 
                   className="flex justify-between items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors" 
                   data-testid={`contributor-${index}`}
-                  onClick={() => setSelectedAsset(contributor.name)}
+                  onClick={() => {
+                    setSelectedAsset(contributor.name);
+                    setSelectedAssetId(contributor.asset_id);
+                  }}
                 >
                   <div>
                     <div className="font-medium text-gray-900 dark:text-dark-text">
                       {contributor.name}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {contributor.weight}% allocation
+                      {contributor.current_allocation?.toFixed(1)}% allocation
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-medium text-success">
-                      +{contributor.return}%
+                      +{contributor.period_return.toFixed(1)}%
                     </div>
                     <div className="text-sm text-success">
-                      +{contributor.contribution}%
+                      +{contributor.contribution.toFixed(2)}%
                     </div>
                   </div>
                 </div>
@@ -421,25 +471,28 @@ export default function Attribution() {
             {topDetractors.length > 0 ? (
               topDetractors.map((detractor, index) => (
                 <div 
-                  key={detractor.id} 
+                  key={detractor.asset_id} 
                   className="flex justify-between items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors" 
                   data-testid={`detractor-${index}`}
-                  onClick={() => setSelectedAsset(detractor.name)}
+                  onClick={() => {
+                    setSelectedAsset(detractor.name);
+                    setSelectedAssetId(detractor.asset_id);
+                  }}
                 >
                   <div>
                     <div className="font-medium text-gray-900 dark:text-dark-text">
                       {detractor.name}
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {detractor.weight}% allocation
+                      {detractor.current_allocation?.toFixed(1)}% allocation
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-medium text-danger">
-                      {detractor.return}%
+                      {detractor.period_return.toFixed(1)}%
                     </div>
                     <div className="text-sm text-danger">
-                      {detractor.contribution}%
+                      {detractor.contribution.toFixed(2)}%
                     </div>
                   </div>
                 </div>
