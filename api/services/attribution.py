@@ -57,7 +57,7 @@ def calculate_twr_attribution(
             
             positions_by_date[date_key][pos.asset_id] = {
                 'quantity': float(pos.quantity or 0),
-                'mv_eod': float(pos.mv_eod or 0),
+                'market_value': float(pos.market_value or 0),
                 'asset_id': pos.asset_id
             }
             all_asset_ids.add(pos.asset_id)
@@ -91,7 +91,7 @@ def calculate_twr_attribution(
                 daily_returns.append(DailyPortfolioReturn(
                     date=current_date,
                     daily_return=0.0,
-                    portfolio_value=sum(pos['mv_eod'] for pos in positions_by_date[current_date].values())
+                    portfolio_value=sum(pos['market_value'] for pos in positions_by_date[current_date].values())
                 ))
                 continue
             
@@ -100,7 +100,7 @@ def calculate_twr_attribution(
             prev_positions = positions_by_date[prev_date]
             
             # 전일 총 포트폴리오 가치 계산
-            prev_total_mv = sum(pos['mv_eod'] for pos in prev_positions.values())
+            prev_total_mv = sum(pos['market_value'] for pos in prev_positions.values())
             
             if prev_total_mv <= 0:
                 continue
@@ -110,7 +110,7 @@ def calculate_twr_attribution(
             
             for asset_id in all_asset_ids:
                 # 전일 비중 계산
-                prev_mv = prev_positions.get(asset_id, {}).get('mv_eod', 0.0)
+                prev_mv = prev_positions.get(asset_id, {}).get('market_value', 0.0)
                 weight_prev = prev_mv / prev_total_mv if prev_total_mv > 0 else 0.0
                 
                 # 자산 수익률 계산
@@ -118,7 +118,9 @@ def calculate_twr_attribution(
                 curr_price = price_data.get((asset_id, current_date))
                 
                 if prev_price and curr_price and prev_price > 0:
-                    asset_return = (curr_price / prev_price) - 1
+                    prev_price_float = float(prev_price)
+                    curr_price_float = float(curr_price)
+                    asset_return = (curr_price_float / prev_price_float) - 1
                 else:
                     asset_return = 0.0
                 
@@ -128,7 +130,7 @@ def calculate_twr_attribution(
                 daily_portfolio_return += contribution
             
             # 현재 포트폴리오 가치
-            current_total_mv = sum(pos['mv_eod'] for pos in current_positions.values())
+            current_total_mv = sum(pos['market_value'] for pos in current_positions.values())
             
             daily_returns.append(DailyPortfolioReturn(
                 date=current_date,
@@ -157,10 +159,10 @@ def calculate_twr_attribution(
             
             for date_key in sorted_dates[:-1]:  # 마지막 날 제외 (전일 비중 기준)
                 positions = positions_by_date[date_key]
-                total_mv = sum(pos['mv_eod'] for pos in positions.values())
+                total_mv = sum(pos['market_value'] for pos in positions.values())
                 
                 if total_mv > 0:
-                    asset_mv = positions.get(asset_id, {}).get('mv_eod', 0.0)
+                    asset_mv = positions.get(asset_id, {}).get('market_value', 0.0)
                     weight = asset_mv / total_mv
                     total_weight += weight
                     weight_count += 1
@@ -170,13 +172,28 @@ def calculate_twr_attribution(
             # 자산 기간 수익률 계산
             first_price = price_data.get((asset_id, sorted_dates[0]))
             last_price = price_data.get((asset_id, sorted_dates[-1]))
-            asset_return = ((last_price / first_price) - 1) * 100 if (first_price and last_price and first_price > 0) else 0.0
+            if first_price and last_price and first_price > 0:
+                first_price_float = float(first_price)
+                last_price_float = float(last_price)
+                asset_return = ((last_price_float / first_price_float) - 1) * 100
+            else:
+                asset_return = 0.0
+            
+            # 현재 allocation 계산 (가장 최근 날짜 기준)
+            latest_date = sorted_dates[-1]
+            latest_positions = positions_by_date[latest_date]
+            total_latest_mv = sum(pos['market_value'] for pos in latest_positions.values())
+            current_asset_mv = latest_positions.get(asset_id, {}).get('market_value', 0.0)
+            current_allocation = (current_asset_mv / total_latest_mv * 100) if total_latest_mv > 0 else 0.0
+            
+            print(f"Asset {asset_id}: mv={current_asset_mv}, total_mv={total_latest_mv}, allocation={current_allocation}%")
             
             asset_detail = AssetContribution(
                 asset_id=asset_id,
                 ticker=asset.ticker or "",
                 name=asset.name or asset.ticker or f"Asset_{asset_id}",
                 asset_class=asset.asset_class or "Unknown",
+                current_allocation=current_allocation,
                 avg_weight=avg_weight,
                 period_return=asset_return,
                 contribution=contribution * 100  # 퍼센트로 변환
@@ -338,23 +355,36 @@ def calculate_detailed_twr_attribution(
                 portfolio_total_mv = 0.0
                 
                 for pos in positions_by_date[date_key].values():
-                    portfolio_total_mv += float(pos.mv_eod or 0)
+                    portfolio_total_mv += float(pos.market_value or 0)
                     
                     asset = asset_info.get(pos.asset_id)
                     if asset and (asset.asset_class or "Unknown") == asset_class:
-                        class_total_mv += float(pos.mv_eod or 0)
+                        class_total_mv += float(pos.market_value or 0)
                 
                 weight_pct = (class_total_mv / portfolio_total_mv * 100) if portfolio_total_mv > 0 else 0.0
                 weight_trend.append(AssetWeightTrend(date=date_key, weight=weight_pct))
                 
-                # 간단한 누적 수익률 계산 (실제로는 더 정교하게 계산해야 함)
+                # 자산클래스별 TWR 계산
                 if i == 0:
                     daily_return = 0.0
+                    base_value = class_total_mv
                 else:
-                    # 이 부분은 실제 TWR 계산으로 대체해야 함
-                    daily_return = 0.0  # 임시값
+                    # 전일 대비 자산클래스 가치 변화 계산
+                    prev_date = sorted_dates[i-1]
+                    prev_class_total_mv = 0.0
+                    
+                    for pos in positions_by_date[prev_date].values():
+                        asset = asset_info.get(pos.asset_id)
+                        if asset and (asset.asset_class or "Unknown") == asset_class:
+                            prev_class_total_mv += float(pos.market_value or 0)
+                    
+                    # 일별 수익률 계산 (가치 변화 기준)
+                    if prev_class_total_mv > 0:
+                        daily_return = ((class_total_mv / prev_class_total_mv) - 1) * 100
+                    else:
+                        daily_return = 0.0
                 
-                cumulative_return += daily_return
+                cumulative_return = ((class_total_mv / base_value) - 1) * 100 if (base_value and base_value > 0) else 0.0
                 return_trend.append(AssetReturnTrend(
                     date=date_key, 
                     cumulative_twr=cumulative_return,
@@ -434,29 +464,50 @@ def calculate_asset_detail(
         
         # 포트폴리오 총 가치 계산
         from sqlalchemy import func
-        portfolio_total_mv = db.query(func.sum(PortfolioPositionDaily.mv_eod)).filter(
+        portfolio_total_mv_decimal = db.query(func.sum(PortfolioPositionDaily.market_value)).filter(
             and_(
                 PortfolioPositionDaily.portfolio_id == portfolio_id,
                 PortfolioPositionDaily.as_of_date == latest_position.as_of_date
             )
         ).scalar() or 0
+        portfolio_total_mv = float(portfolio_total_mv_decimal)
         
-        current_allocation = (float(latest_position.mv_eod or 0) / portfolio_total_mv * 100) if portfolio_total_mv > 0 else 0.0
-        current_price = float(latest_price.close) if latest_price else 0.0
+        current_allocation = (float(latest_position.market_value or 0) / portfolio_total_mv * 100) if portfolio_total_mv > 0 else 0.0
+        current_price = float(latest_price.close) if latest_price and latest_price.close else 0.0
         
         # NAV 수익률 계산 (간단한 가격 변화)
         first_price = prices[0] if prices else None
-        nav_return = ((current_price / float(first_price.close)) - 1) * 100 if (first_price and first_price.close) else 0.0
+        first_price_value = float(first_price.close) if (first_price and first_price.close) else 0.0
+        nav_return = ((current_price / first_price_value) - 1) * 100 if first_price_value > 0 else 0.0
         
-        # TWR 기여도는 전체 계산에서 가져와야 함 (임시로 0)
-        twr_contribution = 0.0
+        # TWR 기여도 계산
+        # 전체 포트폴리오 TWR 계산에서 해당 자산의 기여도를 구해야 함
+        try:
+            # 전체 TWR 계산 호출
+            full_attribution = calculate_twr_attribution(db, portfolio_id, start_date, end_date)
+            
+            # 해당 자산의 기여도 찾기
+            twr_contribution = 0.0
+            for asset_contrib in full_attribution.get("top_contributors", []) + full_attribution.get("top_detractors", []):
+                if asset_contrib.asset_id == asset_id:
+                    twr_contribution = asset_contrib.contribution
+                    print(f"Found TWR contribution for asset {asset_id}: {twr_contribution}%")
+                    break
+            
+            if twr_contribution == 0.0:
+                print(f"No TWR contribution found for asset {asset_id}")
+                
+        except Exception as e:
+            print(f"Error calculating TWR contribution for asset {asset_id}: {e}")
+            twr_contribution = 0.0
         
         # 가격 성과 차트 데이터
         price_performance = []
         if prices:
-            base_price = float(prices[0].close) if prices[0].close else 1.0
+            base_price = float(prices[0].close) if (prices[0] and prices[0].close) else 1.0
             for price in prices:
-                performance = ((float(price.close) / base_price) - 1) * 100 if price.close else 0.0
+                price_close_value = float(price.close) if price.close else 0.0
+                performance = ((price_close_value / base_price) - 1) * 100 if base_price > 0 else 0.0
                 price_performance.append(PricePerformancePoint(
                     date=price.date,
                     performance=performance

@@ -44,6 +44,12 @@ export interface Portfolio {
   }>;
 }
 
+// 포트폴리오 목록 응답 래퍼 (백엔드 PortfoliosResponse와 일치)
+export interface PortfoliosResponse {
+  portfolios: PortfolioListResponse[];
+  total_count?: number;
+}
+
 // ================================
 // PERFORMANCE TYPES
 // ================================
@@ -220,8 +226,7 @@ export interface AssetClassContribution {
 // 개별 자산 가격 성과 데이터
 export interface PricePerformancePoint {
   date: string;            // Date -> string in JSON
-  price: number;           // 자산 가격
-  normalized_value: number; // 정규화된 가치 (기준일=100)
+  performance: number;     // 정규화된 성과 (기준일=0%)
 }
 
 // 개별 자산 상세 정보 (드릴다운용)

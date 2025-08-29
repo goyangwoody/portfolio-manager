@@ -160,6 +160,7 @@ def calculate_period_daily_returns_with_extended_data(all_nav_data: list, start_
             daily_return = ((curr_nav - prev_nav) / prev_nav) * 100
             daily_returns.append(DailyReturnPoint(
                 date=curr_nav_record.as_of_date,
+                daily_return=daily_return,
                 return_pct=daily_return
             ))
     
@@ -215,6 +216,7 @@ async def get_performance_all_time(portfolio_id: int, chart_period: str, db: Ses
     
     return PerformanceAllTimeResponse(
         recent_returns=recent_returns,
+        recent_week_daily_returns=recent_returns.daily_returns or [],
         daily_returns=chart_daily_returns,
         benchmark_returns=benchmark_returns,
         start_date=recent_nav_data[0].as_of_date if recent_nav_data else end_date,
@@ -254,6 +256,9 @@ def calculate_recent_returns(nav_data: list) -> RecentReturnData:
     daily_returns = calculate_recent_week_daily_returns(nav_data)
     
     return RecentReturnData(
+        daily_return=day_1,
+        weekly_return=week_1,
+        monthly_return=month_1,
         day_1=day_1,
         week_1=week_1,
         month_1=month_1,
@@ -280,6 +285,7 @@ def calculate_recent_week_daily_returns(nav_data: list) -> list[DailyReturnPoint
             daily_return = ((curr_nav - prev_nav) / prev_nav) * 100
             daily_returns.append(DailyReturnPoint(
                 date=recent_data[i].as_of_date,
+                daily_return=daily_return,
                 return_pct=daily_return
             ))
     
@@ -329,6 +335,7 @@ def calculate_chart_daily_returns(portfolio_id: int, chart_period: str, end_date
             daily_return = ((curr_nav - prev_nav) / prev_nav) * 100
             daily_returns.append(DailyReturnPoint(
                 date=curr_nav_record.as_of_date,
+                daily_return=daily_return,
                 return_pct=daily_return
             ))
     
