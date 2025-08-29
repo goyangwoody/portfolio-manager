@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell
 import { ChevronLeft, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
 import { PortfolioSelector } from "@/components/portfolio-selector";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { 
   Portfolio, 
   PortfoliosResponse,
@@ -519,12 +520,14 @@ export default function Attribution() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Portfolio Selector */}
-      <PortfolioSelector
-        currentPortfolio={portfolio}
-        onPortfolioChange={handlePortfolioChange}
-        className="mb-6"
-      />
+      {/* Top Header with Portfolio Selector and Theme Toggle */}
+      <div className="flex items-center justify-between mb-6">
+        <PortfolioSelector
+          currentPortfolio={portfolio}
+          onPortfolioChange={handlePortfolioChange}
+        />
+        <ThemeToggle />
+      </div>
 
       {/* Time Period Selector */}
       <TimePeriodSelector

@@ -11,7 +11,7 @@ export interface PortfolioListResponse {
   currency: string;
 }
 
-// KPI 지표가 포함된 포트폴리오 응답 (Overview 페이지용)  
+// KPI 지표가 포함된 포트폴리오 응답 (Hero Cover 섹션용)  
 export interface PortfolioSummaryResponse extends PortfolioListResponse {
   total_return?: number;    // 총 수익률 (%)
   sharpe_ratio?: number;    // 샤프 비율
@@ -36,7 +36,7 @@ export interface Portfolio {
   sharpeRatio: number;
   cashRatio?: number;       // 현금 비중 (%)
   
-  // 차트 데이터 (Overview 페이지용)
+  // 차트 데이터 (Hero Cover 섹션용)
   chartData?: Array<{
     date: string;
     nav: number;

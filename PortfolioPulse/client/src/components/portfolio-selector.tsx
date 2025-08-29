@@ -79,9 +79,6 @@ export function PortfolioSelector({
 
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
-      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-        Portfolio:
-      </span>
       <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
         <Button
           variant={selectedType === "core" ? "default" : "ghost"}
@@ -112,11 +109,6 @@ export function PortfolioSelector({
           {isLoading && selectedType === "usd_core" ? "Loading..." : "USD Core"}
         </Button>
       </div>
-      {currentPortfolio && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          ({currentPortfolio.name})
-        </span>
-      )}
       {isLoading && (
         <span className="text-xs text-blue-500 dark:text-blue-400">
           Loading...

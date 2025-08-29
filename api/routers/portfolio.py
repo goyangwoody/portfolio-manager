@@ -21,12 +21,12 @@ router = APIRouter(tags=["portfolios"])
 @router.get("/portfolios", response_model=PortfoliosResponse)
 async def get_portfolios(
     include_kpi: bool = Query(True, description="KPI 데이터 포함 여부"),
-    include_chart: bool = Query(False, description="차트 데이터 포함 여부 (Overview 페이지용)"),
+    include_chart: bool = Query(False, description="차트 데이터 포함 여부 (Hero Cover 섹션용)"),
     portfolio_type: Optional[str] = Query(None, description="core 또는 usd_core"),
     db: Session = Depends(get_db)
 ):
     """
-    포트폴리오 목록 조회 (Overview 페이지용)
+    포트폴리오 목록 조회 (Hero Cover 섹션용)
     - include_kpi=false: 기본 목록만 (포트폴리오 선택용)
     - include_kpi=true: KPI 포함된 요약 정보
     - include_chart=true: NAV 차트 데이터 포함 (Overview 페이지용)

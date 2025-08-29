@@ -8,14 +8,12 @@ export type TimePeriod = "all" | "1w" | "2w" | "1m" | "custom";
 interface TimePeriodSelectorProps {
   value: TimePeriod;
   onChange: (period: TimePeriod, customWeek?: string, customMonth?: string) => void;
-  variant?: "overview" | "default";
   className?: string;
 }
 
 export function TimePeriodSelector({ 
   value, 
   onChange, 
-  variant = "default", 
   className = ""
 }: TimePeriodSelectorProps) {
   const [showCustom, setShowCustom] = useState(false);
@@ -55,18 +53,12 @@ export function TimePeriodSelector({
     setShowCustom(false);
   };
 
-  const isOverview = variant === "overview";
-
-  const quickOptions = isOverview 
-    ? [
-        { value: "all" as const, label: "All Time" },
-        { value: "1w" as const, label: "1W" },
-        { value: "2w" as const, label: "2W" },
-        { value: "1m" as const, label: "1M" }
-      ]
-    : [
-        { value: "all" as const, label: "All Time" }
-      ];
+  const quickOptions = [
+    { value: "all" as const, label: "All Time" },
+    { value: "1w" as const, label: "1W" },
+    { value: "2w" as const, label: "2W" },
+    { value: "1m" as const, label: "1M" }
+  ];
 
   // Generate week options (last 12 weeks)
   const weekOptions: Array<{ value: string; label: string }> = [];

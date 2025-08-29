@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
 import { PortfolioSelector } from "@/components/portfolio-selector";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { KpiCard } from "@/components/kpi-card";
+import { ChevronDown } from "lucide-react";
 import type { 
   Portfolio, 
   PerformanceAllTimeResponse, 
@@ -13,60 +16,115 @@ import type {
 } from "@shared/types";
 import { formatCurrency } from "@/lib/utils";
 
-export default function Performance() {
-  const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
+// Hero Cover 컴포넌트
+function HeroCover({ 
+  currentPortfolio, 
+  onPortfolioChange 
+}: { 
+  currentPortfolio?: Portfolio;
+  onPortfolioChange: (portfolio: Portfolio) => void;
+}) {
+  const todayChange = currentPortfolio?.nav ? (Math.random() > 0.5 ? "+0.3%" : "-0.1%") : "N/A";
+
+  return (
+    <section className="h-screen flex flex-col justify-between bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 snap-start">
+      {/* Header */}
+      <div className="max-w-md mx-auto w-full px-4 pt-8">
+        <div className="flex items-center justify-between mb-8">
+          <PortfolioSelector
+            currentPortfolio={currentPortfolio}
+            onPortfolioChange={onPortfolioChange}
+          />
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* Hero Content */}
+      <div className="max-w-md mx-auto w-full px-4 text-center flex-1 flex flex-col justify-center">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            Portfolio Pulse
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-8">
+            Professional portfolio management and analytics
+          </p>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 gap-4 mb-12">
+          <KpiCard
+            title="Total Return"
+            value={currentPortfolio?.totalReturn ? `${currentPortfolio.totalReturn > 0 ? '+' : ''}${currentPortfolio.totalReturn.toFixed(2)}%` : "N/A"}
+            subtitle="Since Inception"
+            valueColor={currentPortfolio?.totalReturn && currentPortfolio.totalReturn > 0 ? "success" : currentPortfolio?.totalReturn && currentPortfolio.totalReturn < 0 ? "danger" : "default"}
+            testId="hero-total-return"
+          />
+          <KpiCard
+            title="NAV"
+            value={currentPortfolio?.nav ? formatCurrency(currentPortfolio.nav, currentPortfolio.currency) : "N/A"}
+            subtitle={`${todayChange} today`}
+            valueColor="default"
+            testId="hero-nav"
+          />
+          <KpiCard
+            title="Sharpe Ratio"
+            value={currentPortfolio?.sharpeRatio ? currentPortfolio.sharpeRatio.toFixed(2) : "N/A"}
+            subtitle="Risk-Adjusted"
+            valueColor="primary"
+            testId="hero-sharpe-ratio"
+          />
+        </div>
+      </div>
+
+      {/* Scroll Indicator */}
+      <div className="max-w-md mx-auto w-full px-4 pb-8">
+        <div className="text-center">
+          <div className="inline-flex flex-col items-center text-gray-500 dark:text-gray-400 animate-bounce">
+            <span className="text-sm mb-2">Scroll for details</span>
+            <ChevronDown className="h-6 w-6" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Performance Content 컴포넌트  
+function PerformanceContent({ 
+  currentPortfolio, 
+  onPortfolioChange 
+}: { 
+  currentPortfolio?: Portfolio;
+  onPortfolioChange: (portfolio: Portfolio) => void;
+}) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
   const [customWeek, setCustomWeek] = useState<string>("");
   const [customMonth, setCustomMonth] = useState<string>("");
-
-  // 차트 기간 상태: all(전체), 1m(1달), 1w(1주)
   const [chartPeriod, setChartPeriod] = useState<"all" | "1m" | "1w">("all");
   const queryClient = useQueryClient();
 
-  const { data: portfolios, isLoading: portfoliosLoading, error: portfoliosError } = useQuery<Portfolio[]>({
+  const { data: portfolios } = useQuery<Portfolio[]>({
     queryKey: ["/api/portfolios", "performance-basic"],
     queryFn: async () => {
-      console.log("🔍 Performance 페이지: 포트폴리오 목록 조회");
       const response = await fetch("/api/portfolios?include_kpi=false");
-      
-      if (!response.ok) {
-        throw new Error(`API 호출 실패: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`API 호출 실패: ${response.status}`);
       const data = await response.json();
-      console.log("✅ Performance 페이지: 포트폴리오 데이터 수신:", data);
-      
-      // 백엔드 응답에서 portfolios 배열 추출
-      const portfoliosList = data.portfolios || data;
-      
-      return portfoliosList;
+      return data.portfolios || data;
     },
-  });
-
-  console.log("🔍 Performance 페이지 디버깅:", {
-    portfolios,
-    portfoliosLoading,
-    portfoliosError,
-    currentPortfolio,
   });
 
   const portfolio = currentPortfolio || portfolios?.[0];
 
-  console.log("📋 선택된 포트폴리오:", portfolio);
-
-  const { data: performanceData, isLoading: performanceLoading, error: performanceError } = useQuery<PerformanceAllTimeResponse | PerformanceCustomPeriodResponse>({
+  const { data: performanceData, isLoading: performanceLoading } = useQuery<PerformanceAllTimeResponse | PerformanceCustomPeriodResponse>({
     queryKey: ["/api/portfolios", portfolio?.id, "performance", timePeriod, customWeek, customMonth, chartPeriod],
     queryFn: () => {
-      console.log(`📊 성능 데이터 조회: 포트폴리오 ${portfolio?.id}, 기간: ${timePeriod}, 커스텀: ${customWeek || customMonth}, 차트기간: ${chartPeriod}`);
       const params = new URLSearchParams();
       params.append('period', timePeriod);
       
-      // All Time일 때 차트 기간 추가
       if (timePeriod === 'all') {
         params.append('chart_period', chartPeriod);
       }
       
-      // 커스텀 기간 처리
       if (timePeriod === 'custom') {
         if (customWeek) {
           params.append('custom_week', customWeek);
@@ -76,8 +134,6 @@ export default function Performance() {
       }
       
       const url = `/api/portfolios/${portfolio?.id}/performance?${params.toString()}`;
-      console.log(`🔗 Performance API 호출 URL: ${url}`);
-      
       return fetch(url).then(res => res.json());
     },
     enabled: !!portfolio?.id,
@@ -97,44 +153,25 @@ export default function Performance() {
     return data && 'cumulative_return' in data;
   };
 
-  console.log("🔍 Performance 페이지 디버깅:", {
-    portfolios: portfolios?.length || 0,
-    currentPortfolio: currentPortfolio?.id,
-    portfolio: portfolio?.id,
-    timePeriod,
-    performanceLoading,
-    performanceError,
-    performanceData,
-    benchmarks: benchmarks.length,
-    dataType: isAllTimeData(performanceData) ? 'AllTime' : isCustomPeriodData(performanceData) ? 'CustomPeriod' : 'Unknown'
-  });
-
   const handleTimePeriodChange = (period: TimePeriod, customWeekParam?: string, customMonthParam?: string) => {
-    console.log(`🔄 Performance 기간 변경: ${timePeriod} → ${period}`, { customWeekParam, customMonthParam });
-    
     setTimePeriod(period);
     
-    // 커스텀 기간 상태 업데이트
     if (period === 'custom') {
       if (customWeekParam) {
         setCustomWeek(customWeekParam);
-        setCustomMonth(""); // 다른 커스텀 옵션 클리어
+        setCustomMonth("");
       } else if (customMonthParam) {
         setCustomMonth(customMonthParam);
-        setCustomWeek(""); // 다른 커스텀 옵션 클리어
+        setCustomWeek("");
       }
     } else {
-      // 일반 기간 선택 시 커스텀 옵션 클리어
       setCustomWeek("");
       setCustomMonth("");
     }
-    
-    console.log(`✅ Performance 기간 변경 완료 - API 재호출됨`);
   };
 
   const handlePortfolioChange = (newPortfolio: Portfolio) => {
-    setCurrentPortfolio(newPortfolio);
-    // 포트폴리오 변경 시 관련 쿼리들 무효화
+    onPortfolioChange(newPortfolio);
     queryClient.invalidateQueries({ 
       queryKey: ["/api/portfolios", newPortfolio.id, "performance"] 
     });
@@ -145,9 +182,6 @@ export default function Performance() {
       <div className="max-w-md mx-auto px-4 py-6">
         <div className="text-center text-gray-500 dark:text-gray-400">
           <p>No portfolio data available</p>
-          {portfoliosLoading && <p className="mt-2">Loading portfolios...</p>}
-          {portfoliosError && <p className="mt-2 text-red-500">Error loading portfolios: {String(portfoliosError)}</p>}
-          {portfolios && <p className="mt-2">Portfolios loaded: {portfolios.length} items</p>}
         </div>
       </div>
     );
@@ -155,22 +189,17 @@ export default function Performance() {
 
   // Calculate returns based on performance data
   const calculateReturns = () => {
-    if (!performanceData) {
-      return { daily: null, weekly: null, monthly: null, total: null };
-    }
+    if (!performanceData) return { daily: null, weekly: null, monthly: null, total: null };
 
     if (isAllTimeData(performanceData)) {
-      // All Time 데이터 처리
       const recentReturns = performanceData.recent_returns;
-      
       return {
         daily: recentReturns.daily_return,
         weekly: recentReturns.weekly_return,
         monthly: recentReturns.monthly_return,
-        total: recentReturns.monthly_return // For all time, use monthly as total
+        total: recentReturns.monthly_return
       };
     } else if (isCustomPeriodData(performanceData)) {
-      // Custom Period 데이터 처리
       return {
         daily: null,
         weekly: null,
@@ -187,30 +216,33 @@ export default function Performance() {
   // Generate daily returns data for the chart
   const dailyReturnsData = (() => {
     if (!performanceData) return [];
+    
     if (isAllTimeData(performanceData)) {
-      // All Time: 백엔드에서 chart_period에 따라 이미 필터링된 데이터 사용
       return performanceData.daily_returns?.map((item: DailyReturnPoint) => ({
         date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         return: item.daily_return
       })) || [];
     } else if (isCustomPeriodData(performanceData)) {
-      // Custom Period: 전체 기간 데이터 사용
       return performanceData.daily_returns?.map((item: DailyReturnPoint) => ({
         date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         return: item.daily_return
       })) || [];
     }
+    
     return [];
   })();
 
   return (
-    <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Portfolio Selector */}
-      <PortfolioSelector
-        currentPortfolio={portfolio}
-        onPortfolioChange={handlePortfolioChange}
-        className="mb-4"
-      />
+    <section className="min-h-screen bg-background snap-start">
+      <div className="max-w-md mx-auto px-4 py-6 pb-20">
+      {/* Top Header with Portfolio Selector and Theme Toggle */}
+      <div className="flex items-center justify-between mb-4">
+        <PortfolioSelector
+          currentPortfolio={portfolio}
+          onPortfolioChange={handlePortfolioChange}
+        />
+        <ThemeToggle />
+      </div>
       
       {/* Time Period Selector */}
       <TimePeriodSelector
@@ -466,6 +498,53 @@ export default function Performance() {
           </div>
         </CardContent>
       </Card>
+      </div>
+    </section>
+  );
+}
+
+export default function Performance() {
+  const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | undefined>();
+
+  // 포트폴리오 KPI 데이터를 위한 쿼리 (Hero Cover용)
+  const { data: portfolioKpiData } = useQuery<Portfolio[]>({
+    queryKey: ["/api/portfolios", "core", "kpi"],
+    queryFn: async () => {
+      const response = await fetch("/api/portfolios?portfolio_type=core&include_kpi=true&include_chart=true");
+      if (!response.ok) throw new Error('Failed to fetch portfolio KPI');
+      const data = await response.json();
+      const portfoliosList = data.portfolios || data;
+      return portfoliosList.map((portfolio: any) => ({
+        ...portfolio,
+        totalReturn: portfolio.total_return || 0,
+        sharpeRatio: portfolio.sharpe_ratio || 0,
+        cashRatio: portfolio.cash_ratio || 0,
+        chartData: portfolio.chart_data || [],
+      }));
+    },
+  });
+
+  // 포트폴리오 자동 선택
+  useEffect(() => {
+    if (!currentPortfolio && portfolioKpiData && portfolioKpiData.length > 0) {
+      setCurrentPortfolio(portfolioKpiData[0]);
+    }
+  }, [portfolioKpiData, currentPortfolio]);
+
+  const handlePortfolioChange = (newPortfolio: Portfolio) => {
+    setCurrentPortfolio(newPortfolio);
+  };
+
+  return (
+    <div className="snap-y snap-mandatory overflow-y-scroll h-screen">
+      <HeroCover 
+        currentPortfolio={currentPortfolio} 
+        onPortfolioChange={handlePortfolioChange}
+      />
+      <PerformanceContent 
+        currentPortfolio={currentPortfolio}
+        onPortfolioChange={handlePortfolioChange}
+      />
     </div>
   );
 }

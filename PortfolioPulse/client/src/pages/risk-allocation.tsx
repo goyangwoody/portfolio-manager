@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { DateSelector } from "@/components/date-selector";
 import { PortfolioSelector } from "@/components/portfolio-selector";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { format } from "date-fns";
 import type { 
   Portfolio, 
@@ -195,12 +196,14 @@ export default function RiskAllocation() {
   // 메인 페이지 렌더링
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Portfolio Selector */}
-      <PortfolioSelector
-        currentPortfolio={portfolio}
-        onPortfolioChange={handlePortfolioChange}
-        className="mb-4"
-      />
+      {/* Top Header with Portfolio Selector and Theme Toggle */}
+      <div className="flex items-center justify-between mb-4">
+        <PortfolioSelector
+          currentPortfolio={portfolio}
+          onPortfolioChange={handlePortfolioChange}
+        />
+        <ThemeToggle />
+      </div>
       
       {/* Date Selector */}
       <DateSelector

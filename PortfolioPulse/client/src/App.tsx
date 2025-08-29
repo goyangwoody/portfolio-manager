@@ -6,41 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BottomNavigation } from "@/components/bottom-navigation";
-import Overview from "@/pages/overview";
 import Performance from "@/pages/performance";
 import Attribution from "@/pages/attribution";
 import RiskAllocation from "@/pages/risk-allocation";
 import Assets from "@/pages/assets";
 import NotFound from "@/pages/not-found";
-import { useQuery } from "@tanstack/react-query";
-import type { Portfolio } from "@shared/types";
-
-function Header() {
-  const { data: portfolios } = useQuery<Portfolio[]>({
-    queryKey: ["/api/portfolios"],
-  });
-
-  // Use the first portfolio as default for display
-  const currentPortfolio = portfolios?.[0];
-
-  return (
-    <header className="bg-white dark:bg-dark-card shadow-sm px-4 py-3 sticky top-0 z-40">
-      <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-dark-text" data-testid="text-portfolio-name">
-              {currentPortfolio?.name || "Loading..."}
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400" data-testid="text-last-updated">
-              Updated 2 hours ago
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-      </div>
-    </header>
-  );
-}
 
 function App() {
   return (
@@ -48,10 +18,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <div className="min-h-screen bg-background">
-            <Header />
             <main>
               <Switch>
-                <Route path="/" component={Overview} />
+                <Route path="/" component={Performance} />
                 <Route path="/performance" component={Performance} />
                 <Route path="/attribution" component={Attribution} />
                 <Route path="/assets" component={Assets} />

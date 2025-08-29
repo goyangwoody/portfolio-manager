@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { DateSelector } from "@/components/date-selector";
 import { AssetSortSelector, type SortField, type SortDirection } from "@/components/asset-sort-selector";
 import { PortfolioSelector } from "@/components/portfolio-selector";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ErrorBoundary } from "@/components/error-boundary";
 import type { Portfolio, PortfolioPositionsByDate, PortfolioPositionDailyDetail } from "@shared/types";
 import { formatCurrency, formatLargeNumber } from "@/lib/utils";
@@ -478,12 +479,14 @@ function AssetsContent() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
-      {/* Portfolio Selector */}
-      <PortfolioSelector
-        currentPortfolio={currentPortfolio}
-        onPortfolioChange={handlePortfolioChange}
-        className="mb-6"
-      />
+      {/* Top Header with Portfolio Selector and Theme Toggle */}
+      <div className="flex items-center justify-between mb-6">
+        <PortfolioSelector
+          currentPortfolio={currentPortfolio}
+          onPortfolioChange={handlePortfolioChange}
+        />
+        <ThemeToggle />
+      </div>
 
       {/* Date and Sort Controls */}
       <div className="space-y-4 mb-6">

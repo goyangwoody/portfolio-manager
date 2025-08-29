@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 import sys
 import os
 from pathlib import Path
+import time
 
 # 프로젝트 루트를 sys.path에 추가
 project_root = Path(__file__).parent.parent
@@ -19,6 +20,39 @@ from pm.db.models import (
     MarketInstrument, MarketPriceDaily, RiskFreeRateDaily, MarketDataHelper,
     SessionLocal, engine, Base
 )
+
+class ProgressBar:
+    """간단한 진행률 표시 클래스"""
+    
+    def __init__(self, total: int, prefix: str = "", length: int = 50):
+        self.total = total
+        self.prefix = prefix
+        self.length = length
+        self.current = 0
+        self.start_time = time.time()
+    
+    def update(self, amount: int = 1, suffix: str = ""):
+        """진행률 업데이트"""
+        self.current += amount
+        percent = (self.current / self.total) * 100
+        filled_length = int(self.length * self.current // self.total)
+        bar = '█' * filled_length + '░' * (self.length - filled_length)
+        
+        # 경과 시간 및 예상 남은 시간 계산
+        elapsed = time.time() - self.start_time
+        if self.current > 0:
+            eta = (elapsed / self.current) * (self.total - self.current)
+            eta_str = f" ETA: {int(eta)}s" if eta > 1 else " ETA: <1s"
+        else:
+            eta_str = ""
+        
+        # 진행률 출력
+        print(f'\r{self.prefix} |{bar}| {self.current}/{self.total} ({percent:.1f}%){eta_str} {suffix}', end='', flush=True)
+        
+        if self.current >= self.total:
+            total_time = time.time() - self.start_time
+            print(f'\n✅ 완료! 총 소요시간: {int(total_time)}초')
+
 
 class ImprovedMarketDataCollector:
     """개선된 시장 데이터 수집 클래스"""
@@ -55,23 +89,31 @@ class ImprovedMarketDataCollector:
                 MarketInstrument.is_active == 'Yes'
             ).all()
             
-            print(f"\n💰 가격 데이터 수집 중...")
+            print(f"\n💰 가격 데이터 수집 시작 ({len(instruments)}개 상품)")
             
-            for instrument in instruments:
+            # 전체 인스트루먼트에 대한 진행률 바
+            instrument_progress = ProgressBar(len(instruments), "📊 상품별 진행률")
+            
+            total_new_records = 0
+            total_existing_records = 0
+            
+            for i, instrument in enumerate(instruments):
                 try:
-                    print(f"  - {instrument.symbol} ({instrument.name}) 수집 중...")
-                    
                     # Yahoo Finance에서 데이터 가져오기
                     ticker = yf.Ticker(instrument.symbol)
                     hist = ticker.history(start=start_date, end=end_date)
                     
                     if hist.empty:
-                        print(f"    경고: {instrument.symbol} 데이터가 없습니다.")
+                        instrument_progress.update(1, f"⚠️  {instrument.symbol}: 데이터 없음")
                         continue
                     
                     # 이전 종가 저장용 (일일 수익률 계산)
                     previous_close = None
                     new_records = 0
+                    existing_records = 0
+                    
+                    # 날짜별 데이터 처리 진행률 바
+                    date_progress = ProgressBar(len(hist), f"  📅 {instrument.symbol} 데이터 처리")
                     
                     # 데이터베이스에 저장
                     for date_idx, row in hist.iterrows():
@@ -83,6 +125,8 @@ class ImprovedMarketDataCollector:
                         
                         if existing:
                             previous_close = row['Close']
+                            existing_records += 1
+                            date_progress.update(1, f"존재: {existing_records}")
                             continue  # 이미 존재하는 데이터는 스킵
                         
                         # 일일 수익률 계산
@@ -104,14 +148,27 @@ class ImprovedMarketDataCollector:
                         db.add(price_data)
                         new_records += 1
                         previous_close = row['Close']
+                        
+                        date_progress.update(1, f"신규: {new_records}")
                     
                     db.commit()
-                    print(f"    완료: 전체 {len(hist)} 건 중 {new_records} 건의 새 데이터 저장")
+                    total_new_records += new_records
+                    total_existing_records += existing_records
+                    
+                    instrument_progress.update(1, f"✅ {instrument.symbol}: 신규 {new_records}건, 기존 {existing_records}건")
+                    
+                    # API 제한을 피하기 위한 짧은 대기
+                    time.sleep(0.1)
                     
                 except Exception as e:
-                    print(f"    오류: {instrument.symbol} 데이터 수집 실패 - {str(e)}")
+                    instrument_progress.update(1, f"❌ {instrument.symbol}: 오류")
+                    print(f"\n    ⚠️  오류: {instrument.symbol} 데이터 수집 실패 - {str(e)}")
                     db.rollback()
                     continue
+            
+            print(f"\n🎉 가격 데이터 수집 완료!")
+            print(f"   📈 총 신규 데이터: {total_new_records:,} 건")
+            print(f"   📊 총 기존 데이터: {total_existing_records:,} 건")
                     
         finally:
             db.close()
@@ -129,38 +186,51 @@ class ImprovedMarketDataCollector:
                 MarketInstrument.is_active == 'Yes'
             ).all()
             
-            print(f"\n📊 무위험 이자율 데이터 수집 중...")
+            print(f"\n📊 무위험 이자율 데이터 수집 시작 ({len(rate_instruments)}개 금리)")
             
-            for instrument in rate_instruments:
+            # 전체 금리 상품에 대한 진행률 바
+            rate_progress = ProgressBar(len(rate_instruments), "💰 금리별 진행률")
+            
+            total_new_records = 0
+            total_existing_records = 0
+            
+            for i, instrument in enumerate(rate_instruments):
                 try:
                     if instrument.symbol == 'KOR_BASE_RATE':
                         # 한국은행 기준금리는 수동 데이터 사용
-                        self._collect_kr_base_rate(db, instrument, start_date, end_date)
+                        new_count, existing_count = self._collect_kr_base_rate(db, instrument, start_date, end_date)
                     else:
                         # 미국 이자율은 Yahoo Finance 사용
-                        self._collect_us_treasury_rate(db, instrument, start_date, end_date)
+                        new_count, existing_count = self._collect_us_treasury_rate(db, instrument, start_date, end_date)
+                    
+                    total_new_records += new_count
+                    total_existing_records += existing_count
+                    
+                    rate_progress.update(1, f"✅ {instrument.symbol}: 신규 {new_count}건, 기존 {existing_count}건")
                         
                 except Exception as e:
-                    print(f"    오류: {instrument.symbol} 데이터 수집 실패 - {str(e)}")
-                    db.rollback()
+                    rate_progress.update(1, f"❌ {instrument.symbol}: 오류")
+                    print(f"\n    ⚠️  오류: {instrument.symbol} 금리 데이터 수집 실패 - {str(e)}")
                     continue
+            
+            print(f"\n🎉 무위험 이자율 데이터 수집 완료!")
+            print(f"   💰 총 신규 데이터: {total_new_records:,} 건")
+            print(f"   📊 총 기존 데이터: {total_existing_records:,} 건")
                     
         finally:
             db.close()
 
     def _collect_us_treasury_rate(self, db, instrument: MarketInstrument, start_date: str, end_date: str):
         """미국 국채 이자율 수집"""
-        print(f"  - {instrument.symbol} ({instrument.name}) 수집 중...")
-        
         # Yahoo Finance에서 데이터 가져오기
         ticker = yf.Ticker(instrument.symbol)
         hist = ticker.history(start=start_date, end=end_date)
         
         if hist.empty:
-            print(f"    경고: {instrument.symbol} 데이터가 없습니다.")
-            return
+            return 0, 0  # 신규 0건, 기존 0건
         
         new_records = 0
+        existing_records = 0
         
         # 데이터베이스에 저장
         for date_idx, row in hist.iterrows():
@@ -171,25 +241,23 @@ class ImprovedMarketDataCollector:
             ).first()
             
             if existing:
+                existing_records += 1
                 continue  # 이미 존재하는 데이터는 스킵
             
             # 새 데이터 추가 (Yahoo Finance에서는 이자율이 Close 값으로 제공됨)
             rate_data = RiskFreeRateDaily(
                 instrument_id=instrument.id,
                 date=date_idx.date(),
-                rate=row['Close'],  # 이자율 (%)
-                rate_type='TREASURY_RATE'
+                rate=row['Close']
             )
             db.add(rate_data)
             new_records += 1
         
         db.commit()
-        print(f"    완료: 전체 {len(hist)} 건 중 {new_records} 건의 새 데이터 저장")
+        return new_records, existing_records
 
     def _collect_kr_base_rate(self, db, instrument: MarketInstrument, start_date: str, end_date: str):
         """한국은행 기준금리 수집 (수동 데이터)"""
-        print(f"  - {instrument.symbol} ({instrument.name}) 수집 중...")
-        
         # 예시: 2024년 한국은행 기준금리 (실제 데이터로 교체 필요)
         sample_rates = [
             {'date': '2000-01-01', 'rate': 5.00},  # 2000년 초기 금리
@@ -204,6 +272,7 @@ class ImprovedMarketDataCollector:
         start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
         end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
         new_records = 0
+        existing_records = 0
         
         for rate_info in sample_rates:
             rate_date = datetime.strptime(rate_info['date'], '%Y-%m-%d').date()
@@ -219,33 +288,48 @@ class ImprovedMarketDataCollector:
             ).first()
             
             if existing:
+                existing_records += 1
                 continue  # 이미 존재하는 데이터는 스킵
             
             # 새 데이터 추가
             rate_data = RiskFreeRateDaily(
                 instrument_id=instrument.id,
                 date=rate_date,
-                rate=rate_info['rate'],
-                rate_type='CENTRAL_BANK_RATE'
+                rate=rate_info['rate']
             )
             db.add(rate_data)
             new_records += 1
         
         db.commit()
-        print(f"    완료: {new_records} 건의 새 데이터 저장")
+        return new_records, existing_records
 
     def collect_all_data(self, start_date: str, end_date: str = None) -> None:
         """모든 시장 데이터 수집"""
-        print("=== 개선된 시장 데이터 수집 시작 ===")
-        print(f"수집 기간: {start_date} ~ {end_date or '현재'}")
+        start_time = time.time()
         
-        # 가격 데이터 수집 (벤치마크 지수, 환율)
-        self.collect_price_data(start_date, end_date)
+        print("🚀 === 개선된 시장 데이터 수집 시작 ===")
+        print(f"📅 수집 기간: {start_date} ~ {end_date or '현재'}")
         
-        # 무위험 이자율 데이터 수집
-        self.collect_risk_free_rate_data(start_date, end_date)
+        # 전체 진행률을 위한 큰 섹션들
+        total_sections = 2
+        section_progress = ProgressBar(total_sections, "🌐 전체 진행률")
         
-        print("\n=== 개선된 시장 데이터 수집 완료 ===")
+        try:
+            # 가격 데이터 수집 (벤치마크 지수, 환율)
+            self.collect_price_data(start_date, end_date)
+            section_progress.update(1, "💰 가격 데이터 완료")
+            
+            # 무위험 이자율 데이터 수집
+            self.collect_risk_free_rate_data(start_date, end_date)
+            section_progress.update(1, "📊 금리 데이터 완료")
+            
+            elapsed_time = time.time() - start_time
+            print(f"\n🎉 === 개선된 시장 데이터 수집 완료 ===")
+            print(f"⏱️  총 소요 시간: {elapsed_time:.1f}초")
+            
+        except Exception as e:
+            print(f"\n❌ 데이터 수집 중 오류 발생: {str(e)}")
+            raise
 
     def get_latest_data_summary(self) -> None:
         """최신 데이터 요약 출력"""
