@@ -14,7 +14,7 @@ import type {
   DailyReturnPoint, 
   BenchmarkReturn 
 } from "@shared/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatLargeNumber } from "@/lib/utils";
 
 // Hero Cover 컴포넌트
 function HeroCover({ 
@@ -26,11 +26,20 @@ function HeroCover({
 }) {
   const todayChange = currentPortfolio?.nav ? (Math.random() > 0.5 ? "+0.3%" : "-0.1%") : "N/A";
 
+  // NAV 포맷팅 함수
+  const formatNavValue = (nav: number, currency: string) => {
+    const symbols: { [key: string]: string } = {
+      'KRW': '₩', 'USD': '$', 'EUR': '€', 'JPY': '¥'
+    };
+    const symbol = symbols[currency] || '$';
+    return nav >= 1e6 ? `${symbol}${Math.round(nav / 1e6)}M` : formatCurrency(nav, currency);
+  };
+
   return (
     <section className="h-screen flex flex-col justify-between bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 snap-start">
       {/* Header */}
       <div className="max-w-md mx-auto w-full px-4 pt-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-2">
           <PortfolioSelector
             currentPortfolio={currentPortfolio}
             onPortfolioChange={onPortfolioChange}
@@ -40,18 +49,66 @@ function HeroCover({
       </div>
 
       {/* Hero Content */}
-      <div className="max-w-md mx-auto w-full px-4 text-center flex-1 flex flex-col justify-center">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            Portfolio Pulse
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300 mb-8">
-            Professional portfolio management and analytics
-          </p>
+      <div className="max-w-md mx-auto w-full px-4 flex-1 flex flex-col">
+        <div className="pt-1">
+          <div className="mb-6 space-y-4">
+            {/* Main Title with gradient */}
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Team
+                </div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
+                  The Next<br />Warren Buffetts
+                </h1>
+              </div>
+              <div className="w-16 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+            </div>
+            
+            {/* Description with highlight */}
+            <div className="space-y-2">
+              <p className="text-lg text-gray-700 dark:text-gray-200 leading-relaxed">
+                Competing in <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-md font-semibold">2025 DB GAPS</span>, we are Industrial Engineering students at <span className="font-semibold text-gray-900 dark:text-white">SNU</span> with a passion for finance.
+              </p>
+              <p className="text-base text-gray-600 dark:text-gray-300 italic border-l-4 border-blue-500 pl-4">
+                We pursue quantitative rigor and uphold ethical investing.
+              </p>
+            </div>
+            
+            {/* Team members with icons */}
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 space-y-2">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Our Team</h3>
+              <div className="space-y-1.5">
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Seungjae Lee</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">– Domestic Risk Assets</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Sungan Kwon</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">– Global Risk Assets</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Yesung Lee</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">– Domestic Safe Assets</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Catchphrase with special styling */}
+            <div className="relative">
+              <div className="absolute -left-2 top-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+              <p className="text-lg font-medium text-gray-800 dark:text-gray-100 pl-6">
+                Turning <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent font-bold">analysis</span> into <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent font-bold">alpha</span>, responsibly.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 mb-12">
+        <div className="grid grid-cols-3 gap-3">
           <KpiCard
             title="Total Return"
             value={currentPortfolio?.totalReturn ? `${currentPortfolio.totalReturn > 0 ? '+' : ''}${currentPortfolio.totalReturn.toFixed(2)}%` : "N/A"}
@@ -61,26 +118,24 @@ function HeroCover({
           />
           <KpiCard
             title="NAV"
-            value={currentPortfolio?.nav ? formatCurrency(currentPortfolio.nav, currentPortfolio.currency) : "N/A"}
+            value={currentPortfolio?.nav ? formatNavValue(currentPortfolio.nav, currentPortfolio.currency) : "N/A"}
             subtitle={`${todayChange} today`}
             valueColor="default"
             testId="hero-nav"
           />
           <KpiCard
-            title="Sharpe Ratio"
-            value={currentPortfolio?.sharpeRatio ? currentPortfolio.sharpeRatio.toFixed(2) : "N/A"}
-            subtitle="Risk-Adjusted"
+            title="Cash Ratio"
+            value={currentPortfolio?.cashRatio ? `${currentPortfolio.cashRatio.toFixed(1)}%` : "N/A"}
+            subtitle="Cash Allocation"
             valueColor="primary"
-            testId="hero-sharpe-ratio"
+            testId="hero-cash-ratio"
           />
         </div>
-      </div>
-
-      {/* Scroll Indicator */}
-      <div className="max-w-md mx-auto w-full px-4 pb-8">
-        <div className="text-center">
+        
+        {/* Scroll Indicator - moved inside same container */}
+        <div className="text-center mt-3">
           <div className="inline-flex flex-col items-center text-gray-500 dark:text-gray-400 animate-bounce">
-            <span className="text-sm mb-2">Scroll for details</span>
+            <span className="text-sm mb-1">Scroll for details</span>
             <ChevronDown className="h-6 w-6" />
           </div>
         </div>
@@ -394,26 +449,26 @@ function PerformanceContent({
         </Card>
       )}
 
-      {/* Sharpe Ratio Card - All Time일 때만 표시 */}
+      {/* Cash Ratio Card - All Time일 때만 표시 */}
       {isAllTimeData(performanceData) && (
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
-                  Sharpe Ratio
+                  Cash Ratio
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Risk-adjusted returns (12M)
+                  Cash allocation percentage
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-primary" data-testid="text-sharpe-ratio">
-                  {portfolio.sharpeRatio ? portfolio.sharpeRatio.toFixed(2) : "N/A"}
+                <div className="text-2xl font-bold text-primary" data-testid="text-cash-ratio">
+                  {portfolio.cashRatio ? `${portfolio.cashRatio.toFixed(1)}%` : "N/A"}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {portfolio.sharpeRatio && portfolio.sharpeRatio > 1 ? "Excellent" : 
-                   portfolio.sharpeRatio && portfolio.sharpeRatio > 0.5 ? "Good" : "Below Average"}
+                  {portfolio.cashRatio && portfolio.cashRatio > 20 ? "High Cash" : 
+                   portfolio.cashRatio && portfolio.cashRatio > 5 ? "Moderate Cash" : "Low Cash"}
                 </div>
               </div>
             </div>

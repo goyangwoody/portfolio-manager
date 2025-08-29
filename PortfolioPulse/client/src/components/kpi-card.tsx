@@ -21,7 +21,7 @@ export function KpiCard({ title, value, subtitle, valueColor = "default", testId
   };
 
   return (
-    <div className="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm" data-testid={testId}>
+    <div className="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm text-center" data-testid={testId}>
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
         {title}
       </div>

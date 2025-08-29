@@ -3,6 +3,7 @@ Portfolio overview and holdings services
 """
 from typing import List, Optional
 from datetime import date
+import numpy as np
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 
@@ -16,6 +17,90 @@ from schemas import (
 from src.pm.db.models import (
     Portfolio, PortfolioNavDaily, PortfolioPositionDaily, Asset, Price
 )
+
+def calculate_sharpe_ratio(nav_history: List[PortfolioNavDaily]) -> Optional[float]:
+    """
+    NAV 히스토리를 기반으로 샤프 비율을 계산합니다.
+    
+    Args:
+        nav_history: NAV 일별 데이터 리스트
+    
+    Returns:
+        샤프 비율 또는 None (계산 불가능한 경우)
+    """
+    print(f"[DEBUG] calculate_sharpe_ratio: Received {len(nav_history)} NAV records")
+    
+    if len(nav_history) < 2:
+        print(f"[DEBUG] Not enough NAV records: {len(nav_history)}")
+        return None
+    
+    try:
+        # 무위험 수익률 고정값 사용 (연율 2.5%)
+        risk_free_rate = 0.025
+        
+        # NAV 값들을 추출하고 일별 수익률 계산
+        nav_values = []
+        for nav in nav_history:
+            nav_val = safe_float(nav.nav)
+            if nav_val is not None and nav_val > 0:
+                nav_values.append(nav_val)
+            else:
+                print(f"[DEBUG] Invalid NAV value: {nav_val} on {nav.as_of_date}")
+        
+        print(f"[DEBUG] Valid NAV values: {len(nav_values)}")
+        print(f"[DEBUG] First 5 NAV values: {nav_values[:5]}")
+        print(f"[DEBUG] Last 5 NAV values: {nav_values[-5:]}")
+        
+        if len(nav_values) < 2:
+            print(f"[DEBUG] Not enough valid NAV values: {len(nav_values)}")
+            return None
+        
+        daily_returns = []
+        
+        for i in range(1, len(nav_values)):
+            prev_nav = nav_values[i-1]
+            curr_nav = nav_values[i]
+            
+            if prev_nav > 0 and curr_nav > 0:
+                daily_return = (curr_nav - prev_nav) / prev_nav
+                daily_returns.append(daily_return)
+                if len(daily_returns) <= 5:  # 처음 몇 개만 로그
+                    print(f"[DEBUG] Day {i}: {prev_nav:.4f} -> {curr_nav:.4f} = {daily_return:.6f}")
+        
+        print(f"[DEBUG] Daily returns calculated: {len(daily_returns)} returns")
+        if len(daily_returns) > 0:
+            print(f"[DEBUG] Sample daily returns: {daily_returns[:5]}")
+        
+        if len(daily_returns) < 2:  # 최소 2일 데이터로 완화
+            print(f"[DEBUG] Not enough daily returns: {len(daily_returns)} < 2")
+            return None
+            
+        returns_array = np.array(daily_returns)
+        print(f"[DEBUG] Returns array - Mean: {np.mean(returns_array):.6f}, Std: {np.std(returns_array):.6f}")
+        
+        # 일일 무위험수익률
+        daily_risk_free_rate = risk_free_rate / 252
+        print(f"[DEBUG] Daily risk-free rate: {daily_risk_free_rate:.6f}")
+        
+        # 초과 수익률 계산
+        excess_returns = returns_array - daily_risk_free_rate
+        print(f"[DEBUG] Excess returns - Mean: {np.mean(excess_returns):.6f}")
+        
+        # 샤프 비율 계산 (연환산)
+        std_returns = np.std(returns_array)
+        if std_returns > 0:
+            sharpe_ratio = np.mean(excess_returns) / std_returns * np.sqrt(252)
+            print(f"[DEBUG] Calculated Sharpe ratio: {sharpe_ratio}")
+            return float(sharpe_ratio)
+        else:
+            print(f"[DEBUG] Zero standard deviation")
+            return 0.0
+            
+    except Exception as e:
+        print(f"[ERROR] Error calculating Sharpe ratio: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 async def get_portfolios_service(
     include_kpi: bool = True,
@@ -82,6 +167,11 @@ async def get_portfolios_service(
                     PortfolioNavDaily.portfolio_id == portfolio.id
                 ).order_by(PortfolioNavDaily.as_of_date).all()
                 
+                # 샤프 비율 계산
+                print(f"[DEBUG] Portfolio {portfolio.id}: NAV history length = {len(nav_history)}")
+                sharpe_ratio = calculate_sharpe_ratio(nav_history)
+                print(f"[DEBUG] Portfolio {portfolio.id}: Calculated Sharpe ratio = {sharpe_ratio}")
+                
                 chart_data = []
                 if nav_history:
                     for nav_record in nav_history:
@@ -95,7 +185,7 @@ async def get_portfolios_service(
                     "name": portfolio.name,
                     "currency": portfolio.currency,
                     "total_return": total_return,
-                    "sharpe_ratio": None,
+                    "sharpe_ratio": sharpe_ratio,
                     "nav": nav,
                     "cash_ratio": cash_ratio,
                     "chart_data": chart_data
@@ -103,12 +193,21 @@ async def get_portfolios_service(
                 
                 portfolio_summaries.append(portfolio_with_chart)
             else:
+                # 샤프 비율 계산을 위한 NAV 히스토리 조회
+                nav_history = db.query(PortfolioNavDaily).filter(
+                    PortfolioNavDaily.portfolio_id == portfolio.id
+                ).order_by(PortfolioNavDaily.as_of_date).all()
+                
+                print(f"[DEBUG] Portfolio {portfolio.id}: NAV history length = {len(nav_history)}")
+                sharpe_ratio = calculate_sharpe_ratio(nav_history)
+                print(f"[DEBUG] Portfolio {portfolio.id}: Calculated Sharpe ratio = {sharpe_ratio}")
+                
                 portfolio_summary = PortfolioSummaryResponse(
                     id=portfolio.id,
                     name=portfolio.name,
                     currency=portfolio.currency,
                     total_return=total_return,
-                    sharpe_ratio=None,
+                    sharpe_ratio=sharpe_ratio,
                     nav=nav,
                     cash_ratio=cash_ratio
                 )
