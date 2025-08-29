@@ -74,8 +74,10 @@ export interface DailyReturnPoint {
 // 벤치마크 수익률 데이터
 export interface BenchmarkReturn {
   name: string;             // 벤치마크 이름
+  symbol: string;           // 벤치마크 심볼
   return_pct: number;       // 수익률 (%)
-  outperformance: number;   // 아웃퍼포먼스 (%)
+  excess_return: number;    // 초과 수익률 (%)
+  outperformance: number;   // 아웃퍼포먼스 (%) - 백워드 호환성
 }
 
 // All Time 성과 데이터 응답
