@@ -325,6 +325,51 @@ export interface AttributionCustomPeriodResponse {
 // Legacy attribution types have been removed to use only TWR-based attribution
 // Use AttributionAllTimeResponse, AttributionSpecificPeriodResponse instead
 
+// ================================
+// POSITION TYPES
+// ================================
+
+// 일별 포트폴리오 포지션 기본 타입
+export interface PortfolioPositionDaily {
+  portfolio_id: number;
+  as_of_date: string; // JSON에서는 string으로 직렬화됨
+  asset_id: number;
+  quantity: number; // Decimal -> number in JSON
+  avg_price: number; // Decimal -> number in JSON
+  market_value: number; // Decimal -> number in JSON
+}
+
+// 자산 정보가 포함된 일별 포지션 상세 타입
+export interface PortfolioPositionDailyDetail extends PortfolioPositionDaily {
+  asset_name: string;
+  asset_symbol: string;
+  asset_class: string;
+  current_price?: number; // Optional Decimal -> optional number
+  day_change?: number; // Optional Decimal -> optional number
+  day_change_percent?: number; // Optional Decimal -> optional number
+  weight?: number; // Optional Decimal -> optional number
+}
+
+// 날짜별 포지션 그룹
+export interface PortfolioPositionsByDate {
+  as_of_date: string; // date -> string in JSON
+  positions: PortfolioPositionDailyDetail[];
+  total_market_value: number; // Decimal -> number in JSON
+  asset_count: number;
+}
+
+// 포트폴리오 포지션 히스토리 응답
+export interface PortfolioPositionsHistoryResponse {
+  success: boolean;
+  message: string;
+  data: PortfolioPositionsByDate[];
+  date_range: {
+    start_date: string;
+    end_date: string;
+  };
+  total_dates: number;
+}
+
 export interface Asset extends AssetHoldingResponse {
   portfolioId: string;
   sector: string;

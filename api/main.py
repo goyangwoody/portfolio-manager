@@ -11,7 +11,7 @@ sys.path.insert(0, str(project_root))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import attribution, performance, portfolio
+from routers import attribution, performance, portfolio, assets, position, asset
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -34,6 +34,9 @@ app.add_middleware(
 app.include_router(portfolio.router)
 app.include_router(attribution.router)
 app.include_router(performance.router)
+app.include_router(assets.router)
+app.include_router(position.router)
+app.include_router(asset.router)
 
 # 헬스 체크
 @app.get("/health")
