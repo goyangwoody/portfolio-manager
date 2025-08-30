@@ -105,6 +105,14 @@ function HeroCover({
               </p>
             </div>
           </div>
+          
+          {/* Scroll Indicator - moved between text and KPI cards */}
+          <div className="text-center mb-4">
+            <div className="inline-flex flex-col items-center text-gray-500 dark:text-gray-400 animate-bounce">
+              <span className="text-sm mb-1">Scroll for details</span>
+              <ChevronDown className="h-6 w-6" />
+            </div>
+          </div>
         </div>
 
         {/* KPI Cards */}
@@ -130,14 +138,6 @@ function HeroCover({
             valueColor="primary"
             testId="hero-cash-ratio"
           />
-        </div>
-        
-        {/* Scroll Indicator - moved inside same container */}
-        <div className="text-center mt-3">
-          <div className="inline-flex flex-col items-center text-gray-500 dark:text-gray-400 animate-bounce">
-            <span className="text-sm mb-1">Scroll for details</span>
-            <ChevronDown className="h-6 w-6" />
-          </div>
         </div>
       </div>
     </section>
