@@ -21,18 +21,13 @@ export function KpiCard({ title, value, subtitle, valueColor = "default", testId
   };
 
   return (
-    <div className="bg-white dark:bg-dark-card rounded-xl p-4 shadow-sm text-center" data-testid={testId}>
+    <div className="bg-white dark:bg-dark-card rounded-xl p-3 shadow-sm text-center" data-testid={testId}>
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
         {title}
       </div>
-      <div className={`text-2xl font-bold ${getValueColorClass()}`} data-testid={`text-${testId}-value`}>
+      <div className={`text-xl font-bold ${getValueColorClass()}`} data-testid={`text-${testId}-value`}>
         {value}
       </div>
-      {subtitle && (
-        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1" data-testid={`text-${testId}-subtitle`}>
-          {subtitle}
-        </div>
-      )}
     </div>
   );
 }

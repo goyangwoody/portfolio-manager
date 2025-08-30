@@ -107,34 +107,31 @@ function HeroCover({
           </div>
           
           {/* Scroll Indicator - moved between text and KPI cards */}
-          <div className="text-center mb-4">
+          <div className="text-center">
             <div className="inline-flex flex-col items-center text-gray-500 dark:text-gray-400 animate-bounce">
-              <span className="text-sm mb-1">Scroll for details</span>
-              <ChevronDown className="h-6 w-6" />
+              <span className="text-sm">Scroll for details</span>
+              <ChevronDown className="h-4 w-4" />
             </div>
           </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <KpiCard
             title="Total Return"
             value={currentPortfolio?.totalReturn ? `${currentPortfolio.totalReturn > 0 ? '+' : ''}${currentPortfolio.totalReturn.toFixed(2)}%` : "N/A"}
-            subtitle="Since Inception"
             valueColor={currentPortfolio?.totalReturn && currentPortfolio.totalReturn > 0 ? "success" : currentPortfolio?.totalReturn && currentPortfolio.totalReturn < 0 ? "danger" : "default"}
             testId="hero-total-return"
           />
           <KpiCard
             title="NAV"
             value={currentPortfolio?.nav ? formatNavValue(currentPortfolio.nav, currentPortfolio.currency) : "N/A"}
-            subtitle={`${todayChange} today`}
             valueColor="default"
             testId="hero-nav"
           />
           <KpiCard
             title="Cash Ratio"
             value={currentPortfolio?.cashRatio ? `${currentPortfolio.cashRatio.toFixed(1)}%` : "N/A"}
-            subtitle="Cash Allocation"
             valueColor="primary"
             testId="hero-cash-ratio"
           />
