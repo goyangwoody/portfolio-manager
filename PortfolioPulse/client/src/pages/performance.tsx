@@ -38,7 +38,7 @@ function HeroCover({
   return (
     <section className="h-screen flex flex-col justify-between bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 snap-start">
       {/* Header */}
-      <div className="max-w-md mx-auto w-full px-4 pt-8">
+      <div className="max-w-md mx-auto w-full px-4 pt-4">
         <div className="flex items-center justify-between mb-2">
           <PortfolioSelector
             currentPortfolio={currentPortfolio}
@@ -50,27 +50,27 @@ function HeroCover({
 
       {/* Hero Content */}
       <div className="max-w-md mx-auto w-full px-4 flex-1 flex flex-col">
-        <div className="pt-1">
-          <div className="mb-6 space-y-4">
+        <div>
+          <div className="mb-5 space-y-3">
             {/* Main Title with gradient */}
             <div className="space-y-2">
               <div className="space-y-1">
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Team
                 </div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
                   The Next<br />Warren Buffetts
                 </h1>
               </div>
-              <div className="w-16 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+              <div className="w-14 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
             </div>
             
             {/* Description with highlight */}
             <div className="space-y-2">
-              <p className="text-lg text-gray-700 dark:text-gray-200 leading-relaxed">
+              <p className="text-base text-gray-700 dark:text-gray-200 leading-relaxed">
                 Competing in <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-md font-semibold">2025 DB GAPS</span>, we are Industrial Engineering students at <span className="font-semibold text-gray-900 dark:text-white">SNU</span> with a passion for finance.
               </p>
-              <p className="text-base text-gray-600 dark:text-gray-300 italic border-l-4 border-blue-500 pl-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 italic border-l-4 border-blue-500 pl-4">
                 We pursue quantitative rigor and uphold ethical investing.
               </p>
             </div>
@@ -81,13 +81,13 @@ function HeroCover({
               <div className="space-y-1.5">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="font-semibold text-gray-900 dark:text-white">Seungjae Lee</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">– Domestic Risk Assets</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">Sungahn Kwon</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">– Global Risk Assets</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="font-semibold text-gray-900 dark:text-white">Sungan Kwon</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">– Global Risk Assets</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">Seungjae Lee</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">– Domestic Risk Assets</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
@@ -100,7 +100,7 @@ function HeroCover({
             {/* Catchphrase with special styling */}
             <div className="relative">
               <div className="absolute -left-2 top-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-              <p className="text-lg font-medium text-gray-800 dark:text-gray-100 pl-6">
+              <p className="text-base font-medium text-gray-800 dark:text-gray-100 pl-6">
                 Turning <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent font-bold">analysis</span> into <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent font-bold">alpha</span>, responsibly.
               </p>
             </div>
